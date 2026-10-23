@@ -10,6 +10,9 @@ import DriversPage from "./pages/DriversPage";
 import RestaurantProductsPage from "./pages/RestaurantProductsPage";
 import StoresPage from "./pages/StoresPage";
 import StoreProductsPage from "./pages/StoreProductsPage";
+import "./products-v2.css";
+
+const ProductInventory = () => <div className="products-page-v2"><ProductsPage /></div>;
 
 export default function App() {
   return (
@@ -18,7 +21,7 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="orders" element={<OrdersPage />} />
-        <Route path="products" element={<ProductsPage />} />
+        <Route path="products" element={<ProductInventory />} />
         <Route path="restaurants/:restaurantId/products" element={<RestaurantProductsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="drivers" element={<DriversPage />} />
