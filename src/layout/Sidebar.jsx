@@ -1,44 +1,24 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Package, Grid3X3, Image, Settings, Bike, Store, ChevronLeft, Zap } from "lucide-react";
+import { LayoutGrid, ReceiptText, Bike, Store, Package, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp } from "lucide-react";
 
-const groups = [
-  { title: "التشغيل", items: [
-    { to: "/dashboard", label: "مركز العمليات", icon: LayoutDashboard },
-    { to: "/orders", label: "كل الطلبات", icon: ShoppingBag },
-    { to: "/drivers", label: "الطيارين", icon: Bike },
-  ]},
-  { title: "إدارة المنصة", items: [
-    { to: "/stores", label: "المتاجر والمطاعم", icon: Store },
-    { to: "/products", label: "المنتجات", icon: Package },
-    { to: "/categories", label: "الأقسام", icon: Grid3X3 },
-  ]},
-  { title: "التسويق والنظام", items: [
-    { to: "/banners", label: "البانرات والعروض", icon: Image },
-    { to: "/settings", label: "الإعدادات", icon: Settings },
-  ]},
+const primary=[
+ {to:"/dashboard",label:"نظرة عامة",icon:LayoutGrid},
+ {to:"/orders",label:"الطلبات",icon:ReceiptText},
+ {to:"/drivers",label:"الطيارين",icon:Bike},
+ {to:"/stores",label:"المتاجر",icon:Store},
+];
+const manage=[
+ {to:"/products",label:"المنتجات",icon:Package},
+ {to:"/categories",label:"الأقسام",icon:Shapes},
+ {to:"/banners",label:"المحتوى والعروض",icon:GalleryHorizontalEnd},
 ];
 
-export default function Sidebar() {
-  return (
-    <aside className="sidebar bringo-sidebar">
-      <div className="bringo-brand">
-        <div className="bringo-mark"><Zap size={22} fill="currentColor" /></div>
-        <div><h1>Bringo</h1><span>Operations Center</span></div>
-      </div>
-      <div className="sidebar-live"><i /> النظام متصل ويعمل</div>
-      <nav className="bringo-nav">
-        {groups.map((group) => (
-          <div className="nav-group" key={group.title}>
-            <div className="nav-group-title">{group.title}</div>
-            {group.items.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                <span className="nav-icon"><Icon size={19} /></span><span>{label}</span><ChevronLeft className="nav-arrow" size={15} />
-              </NavLink>
-            ))}
-          </div>
-        ))}
-      </nav>
-      <div className="sidebar-footer"><div className="admin-avatar">OG</div><div><strong>Omar Gad</strong><span>مدير النظام</span></div></div>
-    </aside>
-  );
-}
+function LinkItem({item}){const Icon=item.icon;return <NavLink to={item.to} className={({isActive})=>`product-nav-item ${isActive?"is-active":""}`}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span><ArrowUpLeft className="product-nav-arrow" size={13}/></NavLink>}
+export default function Sidebar(){return <aside className="sidebar product-sidebar" dir="rtl">
+ <div className="product-brand"><div className="wordmark">bringo<span>.</span></div><small>لوحة التشغيل</small></div>
+ <nav className="product-nav">
+  <div className="product-nav-section">العمل اليومي</div>{primary.map(x=><LinkItem item={x} key={x.to}/>)}
+  <div className="product-nav-section second">إدارة الكتالوج</div>{manage.map(x=><LinkItem item={x} key={x.to}/>)}
+ </nav>
+ <div className="product-sidebar-bottom"><NavLink to="/settings" className={({isActive})=>`product-nav-item ${isActive?"is-active":""}`}><Settings size={18}/><span>الإعدادات</span></NavLink><button className="sidebar-help" type="button"><CircleHelp size={17}/><span>مركز المساعدة</span></button><div className="product-user"><div className="user-initial">O</div><div><strong>Omar Gad</strong><small>Administrator</small></div><span className="user-online"/></div></div>
+ </aside>}
