@@ -1,17 +1,7 @@
-export default function SettingsPage() {
-  return (
-    <div>
-      <h1 className="page-title">الإعدادات</h1>
-
-      <div className="card">
-        <div className="form-grid">
-          <input placeholder="الحد الأدنى للطلب" />
-          <input placeholder="رسوم التوصيل" />
-          <input placeholder="وقت إغلاق التطبيق" />
-        </div>
-
-        <button>حفظ الإعدادات</button>
-      </div>
-    </div>
-  );
-}
+import { useEffect,useState } from "react";
+import { db } from "../firebase";
+import { ref,onValue,update } from "firebase/database";
+import { Save,Truck,ShoppingBasket,Clock3,Power,ShieldCheck } from "lucide-react";
+import "../admin-v2.css";
+const defaults={minOrder:0,deliveryPerKm:8,openingTime:"08:00",closingTime:"02:00",acceptOrders:true};
+export default function SettingsPage(){const[form,setForm]=useState(defaults),[saving,setSaving]=useState(false);useEffect(()=>onValue(ref(db,"settings"),s=>setForm({...defaults,...(s.val()||{})})),[]);const save=async e=>{e.preventDefault();setSaving(true);await update(ref(db,"settings"),{...form,minOrder:Number(form.minOrder||0),deliveryPerKm:Number(form.deliveryPerKm||0),updatedAt:Date.now()});setSaving(false);alert("تم حفظ إعدادات Bringo")};return <div className="settings-product-page" dir="rtl"><div className="catalog-heading"><div><span>SYSTEM</span><h1>إعدادات Bringo</h1><p>إعدادات التشغيل الأساسية التي تتحكم في تجربة الطلب والتوصيل.</p></div><div className="settings-safe"><ShieldCheck size={16}/> التغييرات تحفظ مباشرة في Firebase</div></div><form onSubmit={save} className="settings-layout"><section className="settings-section"><div className="settings-section-title"><ShoppingBasket size={18}/><div><h3>الطلبات</h3><p>القواعد الأساسية لإنشاء الطلب.</p></div></div><div className="settings-row"><div><strong>الحد الأدنى للطلب</strong><small>أقل قيمة منتجات تسمح للعميل بإتمام الطلب.</small></div><div className="setting-input"><input type="number" value={form.minOrder} onChange={e=>setForm({...form,minOrder:e.target.value})}/><span>جنيه</span></div></div><div className="settings-row"><div><strong>استقبال الطلبات</strong><small>إيقافه يمنع إنشاء طلبات جديدة مؤقتًا.</small></div><button type="button" className={`product-switch ${form.acceptOrders?"on":""}`} onClick={()=>setForm({...form,acceptOrders:!form.acceptOrders})}><i/></button></div></section><section className="settings-section"><div className="settings-section-title"><Truck size={18}/><div><h3>التوصيل</h3><p>تسعير خدمة التوصيل داخل Bringo.</p></div></div><div className="settings-row"><div><strong>سعر الكيلومتر</strong><small>القيمة المستخدمة لحساب رسوم التوصيل حسب المسافة.</small></div><div className="setting-input"><input type="number" value={form.deliveryPerKm} onChange={e=>setForm({...form,deliveryPerKm:e.target.value})}/><span>ج / كم</span></div></div></section><section className="settings-section"><div className="settings-section-title"><Clock3 size={18}/><div><h3>ساعات التشغيل</h3><p>الفترة الافتراضية التي تستقبل فيها المنصة الطلبات.</p></div></div><div className="settings-row"><div><strong>بداية العمل</strong></div><input className="time-input" type="time" value={form.openingTime} onChange={e=>setForm({...form,openingTime:e.target.value})}/></div><div className="settings-row"><div><strong>نهاية العمل</strong></div><input className="time-input" type="time" value={form.closingTime} onChange={e=>setForm({...form,closingTime:e.target.value})}/></div></section><div className="settings-savebar"><div><Power size={15}/><span>{form.acceptOrders?"Bringo يستقبل الطلبات الآن":"استقبال الطلبات متوقف"}</span></div><button className="product-primary" disabled={saving}><Save size={15}/>{saving?"جاري الحفظ...":"حفظ التغييرات"}</button></div></form></div>}
