@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ReceiptText, Bike, Store, Package, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp } from "lucide-react";
+import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp } from "lucide-react";
 
 const primary=[
  {to:"/dashboard",label:"نظرة عامة",icon:LayoutGrid},
@@ -8,7 +8,6 @@ const primary=[
  {to:"/stores",label:"المتاجر",icon:Store},
 ];
 const manage=[
- {to:"/products",label:"المنتجات",icon:Package},
  {to:"/categories",label:"الأقسام",icon:Shapes},
  {to:"/banners",label:"المحتوى والعروض",icon:GalleryHorizontalEnd},
 ];
@@ -18,7 +17,7 @@ export default function Sidebar(){return <aside className="sidebar product-sideb
  <div className="product-brand"><div className="wordmark">bringo<span>.</span></div><small>لوحة التشغيل</small></div>
  <nav className="product-nav">
   <div className="product-nav-section">العمل اليومي</div>{primary.map(x=><LinkItem item={x} key={x.to}/>)}
-  <div className="product-nav-section second">إدارة الكتالوج</div>{manage.map(x=><LinkItem item={x} key={x.to}/>)}
+  <div className="product-nav-section second">إدارة المنصة</div>{manage.map(x=><LinkItem item={x} key={x.to}/>)}
  </nav>
  <div className="product-sidebar-bottom"><NavLink to="/settings" className={({isActive})=>`product-nav-item ${isActive?"is-active":""}`}><Settings size={18}/><span>الإعدادات</span></NavLink><button className="sidebar-help" type="button"><CircleHelp size={17}/><span>مركز المساعدة</span></button><div className="product-user"><div className="user-initial">O</div><div><strong>Omar Gad</strong><small>Administrator</small></div><span className="user-online"/></div></div>
  </aside>}
