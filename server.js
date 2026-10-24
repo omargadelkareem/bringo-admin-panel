@@ -41,6 +41,24 @@ function extractTokens(user) {
   return [...tokens];
 }
 
+function chunks(items, size = 500) {
+  const result = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
+
+function messageFor(tokens, title, body, data) {
+  return {
+    tokens,
+    notification: { title: title.trim(), body: body.trim() },
+    data,
+    android: { priority: 'high' },
+    apns: { payload: { aps: { sound: 'default' } } },
+  };
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bringo-notifications' }));
 
 app.post('/api/send-notification', async (req, res) => {
@@ -74,14 +92,9 @@ app.post('/api/send-notification', async (req, res) => {
       Object.entries({ ...data, notificationId }).map(([key, value]) => [key, String(value ?? '')]),
     );
 
-    const message = {
-      tokens,
-      notification: { title: title.trim(), body: body.trim() },
-      data: stringData,
-      android: { priority: 'high' },
-      apns: { payload: { aps: { sound: 'default' } } },
-    };
-    const result = await admin.messaging().sendEachForMulticast(message);
+    const result = await admin.messaging().sendEachForMulticast(
+      messageFor(tokens, title, body, stringData),
+    );
 
     return res.json({
       ok: result.successCount > 0,
@@ -95,6 +108,80 @@ app.post('/api/send-notification', async (req, res) => {
   } catch (error) {
     console.error('send-notification error', error);
     return res.status(500).json({ error: error?.message || 'Failed to send notification' });
+  }
+});
+
+app.post('/api/send-notification-all', async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    firebaseAdmin();
+    const { title, body, data = {} } = req.body || {};
+    if (!title?.trim() || !body?.trim()) {
+      return res.status(400).json({ error: 'title and body are required' });
+    }
+
+    const usersSnapshot = await admin.database().ref('users').get();
+    const users = usersSnapshot.val() || {};
+    const tokenSet = new Set();
+    let usersWithTokens = 0;
+
+    Object.values(users).forEach((user) => {
+      const userTokens = extractTokens(user);
+      if (userTokens.length) usersWithTokens += 1;
+      userTokens.forEach((token) => tokenSet.add(token));
+    });
+
+    const tokens = [...tokenSet];
+    if (!tokens.length) {
+      return res.status(404).json({ error: 'No customers have FCM tokens yet' });
+    }
+
+    const notificationRef = admin.database().ref('notifications').push();
+    const notificationId = notificationRef.key;
+    await notificationRef.set({
+      audience: 'all',
+      title: title.trim(),
+      body: body.trim(),
+      isBroadcast: true,
+      createdAt: admin.database.ServerValue.TIMESTAMP,
+      data,
+    });
+
+    const stringData = Object.fromEntries(
+      Object.entries({ ...data, notificationId, audience: 'all' }).map(([key, value]) => [key, String(value ?? '')]),
+    );
+
+    let successCount = 0;
+    let failureCount = 0;
+    const errors = [];
+
+    for (const tokenBatch of chunks(tokens, 500)) {
+      const result = await admin.messaging().sendEachForMulticast(
+        messageFor(tokenBatch, title, body, stringData),
+      );
+      successCount += result.successCount;
+      failureCount += result.failureCount;
+      result.responses.forEach((item) => {
+        if (!item.success) {
+          errors.push({ code: item.error?.code, message: item.error?.message });
+        }
+      });
+    }
+
+    return res.json({
+      ok: successCount > 0,
+      notificationId,
+      registeredCustomers: Object.keys(users).length,
+      usersWithTokens,
+      deviceCount: tokens.length,
+      successCount,
+      failureCount,
+      errors: errors.slice(0, 20),
+    });
+  } catch (error) {
+    console.error('send-notification-all error', error);
+    return res.status(500).json({ error: error?.message || 'Failed to broadcast notification' });
   }
 });
 
