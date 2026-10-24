@@ -9,6 +9,7 @@ const port = Number(process.env.API_PORT || 3001);
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './firebase-service-account.json';
 const databaseURL = process.env.FIREBASE_DATABASE_URL || 'https://nezamak-41fe2-default-rtdb.firebaseio.com';
 const adminApiKey = process.env.BRINGO_ADMIN_API_KEY || 'bringo-local-admin';
+const notificationChannelId = 'bringo_notifications_v2';
 
 app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
 app.use(express.json({ limit: '256kb' }));
@@ -46,8 +47,20 @@ function messageFor(tokens, title, body, data) {
   return {
     tokens,
     notification: { title: title.trim(), body: body.trim() },
-    data,
-    android: { priority: 'high', notification: { channelId: 'bringo_notifications', sound: 'default' } },
+    data: Object.fromEntries(
+      Object.entries({ ...data, title: title.trim(), body: body.trim() })
+        .map(([key, value]) => [key, String(value ?? '')]),
+    ),
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: notificationChannelId,
+        sound: 'default',
+        priority: 'max',
+        visibility: 'public',
+        defaultVibrateTimings: true,
+      },
+    },
     apns: { payload: { aps: { sound: 'default' } } },
   };
 }
