@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp } from "lucide-react";
+import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, BellRing } from "lucide-react";
 
 const primary=[
  {to:"/dashboard",label:"نظرة عامة",icon:LayoutGrid},
@@ -10,6 +10,7 @@ const primary=[
 const manage=[
  {to:"/categories",label:"الأقسام",icon:Shapes},
  {to:"/banners",label:"المحتوى والعروض",icon:GalleryHorizontalEnd},
+ {to:"/notifications",label:"الإشعارات",icon:BellRing},
 ];
 
 function LinkItem({item}){const Icon=item.icon;return <NavLink to={item.to} className={({isActive})=>`product-nav-item ${isActive?"is-active":""}`}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span><ArrowUpLeft className="product-nav-arrow" size={13}/></NavLink>}
