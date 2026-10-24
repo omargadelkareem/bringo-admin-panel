@@ -9,6 +9,7 @@ import DriversPage from "./pages/DriversPage";
 import RestaurantProductsPage from "./pages/RestaurantProductsPage";
 import StoresPage from "./pages/StoresPage";
 import StoreProductsPage from "./pages/StoreProductsPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="stores" element={<StoresPage />} />
         <Route path="stores/:storeId/products" element={<StoreProductsPage />} />
         <Route path="banners" element={<BannersPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
