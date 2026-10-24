@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { BellRing, Send, UserRound, UsersRound } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, Send, Smartphone, UserRound, UsersRound, XCircle } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_NOTIFICATION_API_URL || "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_NOTIFICATION_API_URL || "";
 const API_KEY = import.meta.env.VITE_BRINGO_ADMIN_API_KEY || "bringo-local-admin";
 
 export default function NotificationsPage() {
@@ -20,7 +20,6 @@ export default function NotificationsPage() {
   async function sendNotification(event) {
     event.preventDefault();
     if (!canSend) return;
-
     if (audience === "all" && !window.confirm("إرسال الإشعار إلى كل العملاء المسجلين؟")) return;
 
     setSending(true);
@@ -47,18 +46,34 @@ export default function NotificationsPage() {
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "فشل إرسال الإشعار");
-      if (!payload.ok) throw new Error(payload.errors?.[0]?.message || "لم يصل الإشعار لأي جهاز");
+
+      const successCount = Number(payload.successCount || 0);
+      const failureCount = Number(payload.failureCount || 0);
+      const deviceCount = Number(payload.deviceCount ?? (successCount + failureCount));
+      const errors = Array.isArray(payload.errors) ? payload.errors : [];
 
       setResult({
-        type: "success",
-        text: isBroadcast
-          ? `تم الإرسال إلى ${payload.successCount || 0} جهاز من ${payload.deviceCount || 0} جهاز مسجل.`
-          : `تم الإرسال بنجاح إلى ${payload.successCount || 1} جهاز.`,
+        type: payload.ok && successCount > 0 ? "success" : "error",
+        isBroadcast,
+        successCount,
+        failureCount,
+        deviceCount,
+        usersWithTokens: Number(payload.usersWithTokens || 0),
+        registeredCustomers: Number(payload.registeredCustomers || 0),
+        notificationId: payload.notificationId || "",
+        errors,
       });
-      setTitle("");
-      setBody("");
+
+      if (payload.ok && successCount > 0) {
+        setTitle("");
+        setBody("");
+      }
     } catch (error) {
-      setResult({ type: "error", text: error.message || "فشل إرسال الإشعار" });
+      setResult({
+        type: "error",
+        message: error.message || "فشل إرسال الإشعار",
+        errors: [],
+      });
     } finally {
       setSending(false);
     }
@@ -70,6 +85,7 @@ export default function NotificationsPage() {
         <div><h3>إرسال إشعار</h3><p>أرسل إشعار Push لكل العملاء أو لعميل محدد.</p></div>
         <BellRing size={24} />
       </div>
+
       <form className="notification-form" onSubmit={sendNotification}>
         <label>
           <span>المستلمون</span>
@@ -87,7 +103,43 @@ export default function NotificationsPage() {
 
         <label><span>عنوان الإشعار</span><input value={title} onChange={(e)=>setTitle(e.target.value)} placeholder="مثال: عرض جديد من Bringo" maxLength={80}/></label>
         <label><span>الرسالة</span><textarea value={body} onChange={(e)=>setBody(e.target.value)} placeholder="اكتب الرسالة التي ستظهر للعملاء" rows={5} maxLength={300}/><small>{body.length}/300</small></label>
-        {result && <div className={`notification-result ${result.type}`}>{result.text}</div>}
+
+        {result && (
+          <div className={`notification-result ${result.type}`}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+              {result.type === "success" ? <CheckCircle2 size={19}/> : <AlertTriangle size={19}/>} 
+              <span>{result.message || (result.type === "success" ? "تم تنفيذ طلب الإرسال" : "لم يصل الإشعار لأي جهاز")}</span>
+            </div>
+
+            {result.successCount !== undefined && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 12 }}>
+                <div><Smartphone size={16}/><strong>{result.deviceCount}</strong><small> جهاز مستهدف</small></div>
+                <div><CheckCircle2 size={16}/><strong>{result.successCount}</strong><small> نجح</small></div>
+                <div><XCircle size={16}/><strong>{result.failureCount}</strong><small> فشل</small></div>
+              </div>
+            )}
+
+            {result.isBroadcast && (
+              <div style={{ marginTop: 8, fontSize: 13 }}>
+                عملاء لديهم FCM: <strong>{result.usersWithTokens}</strong> من <strong>{result.registeredCustomers}</strong>
+              </div>
+            )}
+
+            {result.notificationId && <div style={{ marginTop: 6, fontSize: 12 }}>Notification ID: <code>{result.notificationId}</code></div>}
+
+            {result.errors?.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <strong>أخطاء Firebase:</strong>
+                {result.errors.slice(0, 5).map((error, index) => (
+                  <div key={`${error.code || "error"}-${index}`} style={{ marginTop: 5, fontSize: 12 }}>
+                    {error.code || "FCM error"}: {error.message || "Unknown error"}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <button className="notification-send" type="submit" disabled={!canSend}><Send size={18}/>{sending ? "جاري الإرسال..." : audience === "all" ? "إرسال لكل العملاء" : "إرسال الإشعار"}</button>
       </form>
     </section>
