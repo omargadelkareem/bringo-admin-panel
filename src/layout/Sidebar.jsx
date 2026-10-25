@@ -1,18 +1,19 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp } from "lucide-react";
+import { LayoutGrid, ReceiptText, Bike, Store, StoreIcon, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, Plus } from "lucide-react";
 
 const primary=[
  {to:"/dashboard",label:"نظرة عامة",icon:LayoutGrid},
  {to:"/orders",label:"الطلبات",icon:ReceiptText},
  {to:"/drivers",label:"الطيارين",icon:Bike},
  {to:"/stores",label:"المتاجر",icon:Store},
+ {to:"/stores/new",label:"إضافة متجر",icon:Plus},
 ];
 const manage=[
  {to:"/categories",label:"الأقسام",icon:Shapes},
  {to:"/banners",label:"المحتوى والعروض",icon:GalleryHorizontalEnd},
 ];
 
-function LinkItem({item}){const Icon=item.icon;return <NavLink to={item.to} className={({isActive})=>`product-nav-item ${isActive?"is-active":""}`}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span><ArrowUpLeft className="product-nav-arrow" size={13}/></NavLink>}
+function LinkItem({item}){const Icon=item.icon;return <NavLink to={item.to} end={item.to==="/stores"} className={({isActive})=>`product-nav-item ${isActive?"is-active":""}`}><Icon size={18} strokeWidth={1.8}/><span>{item.label}</span><ArrowUpLeft className="product-nav-arrow" size={13}/></NavLink>}
 export default function Sidebar(){return <aside className="sidebar product-sidebar" dir="rtl">
  <div className="product-brand"><div className="wordmark">bringo<span>.</span></div><small>لوحة التشغيل</small></div>
  <nav className="product-nav">
