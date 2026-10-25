@@ -8,6 +8,7 @@ import SettingsPage from "./pages/SettingsPage";
 import DriversPage from "./pages/DriversPage";
 import RestaurantProductsPage from "./pages/RestaurantProductsPage";
 import StoresPage from "./pages/StoresPage";
+import AddStorePage from "./pages/AddStorePage";
 import StoreProductsPage from "./pages/StoreProductsPage";
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="drivers" element={<DriversPage />} />
         <Route path="stores" element={<StoresPage />} />
+        <Route path="stores/new" element={<AddStorePage />} />
         <Route path="stores/:storeId/products" element={<StoreProductsPage />} />
         <Route path="banners" element={<BannersPage />} />
         <Route path="settings" element={<SettingsPage />} />
