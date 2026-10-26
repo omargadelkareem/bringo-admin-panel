@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { push, ref, set } from "firebase/database";
-import { ArrowRight, ImagePlus, MapPin, Save, Store } from "lucide-react";
+import { ArrowRight, ImagePlus, KeyRound, MapPin, Save, Store } from "lucide-react";
 import { db } from "../firebase";
 import "../admin-v2.css";
 
@@ -33,6 +33,9 @@ const emptyForm = {
   tags: "",
   description: "",
   isOpen: true,
+  providerName: "",
+  providerEmail: "",
+  providerPassword: "",
 };
 
 export default function AddStorePage() {
@@ -57,16 +60,24 @@ export default function AddStorePage() {
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    const email = form.providerEmail.trim().toLowerCase();
+    const password = form.providerPassword.trim();
     if (!form.name.trim()) return setError("اكتب اسم المتجر");
     if (!form.phone.trim()) return setError("اكتب رقم هاتف المتجر");
     if (!form.address.trim()) return setError("اكتب عنوان المتجر");
     if (!form.deliveryZoneId) return setError("حدد منطقة توصيل المتجر");
+    if (!form.providerName.trim()) return setError("اكتب اسم مقدم الخدمة");
+    if (!email || !email.includes("@")) return setError("اكتب بريد دخول صحيح لمقدم الخدمة");
+    if (password.length < 6) return setError("كلمة المرور يجب ألا تقل عن 6 أحرف");
 
     try {
       setSaving(true);
       const storeRef = push(ref(db, "stores"));
       const id = storeRef.key;
+      const providerRef = push(ref(db, "providerUsers"));
+      const providerId = providerRef.key;
       const now = Date.now();
+
       await set(storeRef, {
         id,
         name: form.name.trim(),
@@ -80,13 +91,30 @@ export default function AddStorePage() {
         description: form.description.trim(),
         isOpen: form.isOpen,
         acceptsOrders: form.isOpen,
+        isActive: true,
+        providerId,
+        providerEmail: email,
         createdAt: now,
         updatedAt: now,
       });
+
+      await set(providerRef, {
+        id: providerId,
+        storeId: id,
+        name: form.providerName.trim(),
+        email,
+        password,
+        phone: form.phone.trim(),
+        role: "provider",
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+
       navigate(`/stores/${id}/products`);
     } catch (e) {
       console.error("Add store error:", e);
-      setError(`تعذر إضافة المتجر${e?.code ? ` (${e.code})` : ""}`);
+      setError(`تعذر إضافة المتجر أو حساب مقدم الخدمة${e?.code ? ` (${e.code})` : ""}`);
     } finally {
       setSaving(false);
     }
@@ -98,7 +126,7 @@ export default function AddStorePage() {
         <div>
           <small style={{ color: "#167a55", fontWeight: 900 }}>NEW PARTNER</small>
           <h1 style={{ margin: "5px 0 6px", color: "#17312a" }}>إضافة متجر جديد</h1>
-          <p style={{ margin: 0, color: "#697773" }}>سجّل بيانات المتجر، وبعد الحفظ هنفتح صفحة المنتجات مباشرة.</p>
+          <p style={{ margin: 0, color: "#697773" }}>سجّل المتجر وحساب دخول مقدم الخدمة في خطوة واحدة.</p>
         </div>
         <button type="button" onClick={() => navigate("/stores")} style={secondaryButton}><ArrowRight size={17}/> رجوع للمتاجر</button>
       </div>
@@ -110,6 +138,16 @@ export default function AddStorePage() {
           <Field label="نوع المتجر *"><select style={inputStyle} value={form.type} onChange={(e) => change("type", e.target.value)}>{Object.entries(types).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></Field>
           <Field label="رقم الهاتف *"><input style={inputStyle} value={form.phone} onChange={(e) => change("phone", e.target.value)} placeholder="01xxxxxxxxx" /></Field>
           <Field label="العنوان *"><input style={inputStyle} value={form.address} onChange={(e) => change("address", e.target.value)} placeholder="الشارع / المنطقة / علامة مميزة" /></Field>
+        </div>
+
+        <div style={{ ...sectionTitle, marginTop: 26 }}><KeyRound size={18}/> حساب مقدم الخدمة</div>
+        <div style={{ padding: 18, border: "1px solid #dce8e3", borderRadius: 12, background: "#f7fbf9" }}>
+          <div style={gridStyle}>
+            <Field label="اسم مقدم الخدمة *"><input style={inputStyle} value={form.providerName} onChange={(e) => change("providerName", e.target.value)} placeholder="اسم صاحب أو مدير المتجر" /></Field>
+            <Field label="البريد الإلكتروني للدخول *"><input type="email" autoComplete="off" style={inputStyle} value={form.providerEmail} onChange={(e) => change("providerEmail", e.target.value)} placeholder="store@bringo.app" /></Field>
+            <Field label="كلمة المرور *"><input type="text" autoComplete="off" style={inputStyle} value={form.providerPassword} onChange={(e) => change("providerPassword", e.target.value)} placeholder="6 أحرف على الأقل" /></Field>
+          </div>
+          <p style={{ margin: "12px 0 0", color: "#697773", fontSize: 12, fontWeight: 700 }}>هذه البيانات هي التي سيستخدمها مقدم الخدمة للدخول إلى لوحة Bringo Provider، وسيتم ربط الحساب بهذا المتجر تلقائيًا.</p>
         </div>
 
         <div style={{ ...sectionTitle, marginTop: 26 }}><MapPin size={18}/> منطقة التوصيل</div>
@@ -132,7 +170,7 @@ export default function AddStorePage() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 26, paddingTop: 20, borderTop: "1px solid #e8eeeb" }}>
           <button type="button" onClick={() => navigate("/stores")} style={secondaryButton}>إلغاء</button>
-          <button type="submit" disabled={saving} style={{ ...primaryButton, opacity: saving ? .65 : 1 }}><Save size={17}/>{saving ? "جاري إضافة المتجر..." : "حفظ وفتح المنتجات"}</button>
+          <button type="submit" disabled={saving} style={{ ...primaryButton, opacity: saving ? .65 : 1 }}><Save size={17}/>{saving ? "جاري إنشاء المتجر والحساب..." : "حفظ المتجر وإنشاء الحساب"}</button>
         </div>
       </form>
     </div>
