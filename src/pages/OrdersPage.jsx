@@ -1,276 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
 import { ref, onValue, update } from "firebase/database";
+import { Search, ShoppingBag, Clock3, CheckCircle2, XCircle, Bike, Eye, Filter } from "lucide-react";
+import "../admin-v2.css";
 
-const tabs = [
-  { key: "pending", label: "جديدة" },
-  { key: "preparing", label: "جاري التحضير" },
-  { key: "onDelivery", label: "في الطريق" },
-  { key: "completed", label: "مكتملة" },
-  { key: "cancelled", label: "ملغية" },
-];
-
-export default function OrdersPage() {
-  const [orders, setOrders] = useState([]);
-  const [drivers, setDrivers] = useState([]);
-  const [activeTab, setActiveTab] = useState("pending");
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [selectedDriverId, setSelectedDriverId] = useState("");
-
-  useEffect(() => {
-    const ordersRef = ref(db, "orders");
-    const driversRef = ref(db, "drivers");
-
-    const unsubOrders = onValue(ordersRef, (snapshot) => {
-      const data = snapshot.val() || {};
-
-      const list = Object.entries(data).map(([key, value]) => ({
-        firebaseKey: key,
-        ...value,
-      }));
-
-      list.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-      setOrders(list);
-    });
-
-    const unsubDrivers = onValue(driversRef, (snapshot) => {
-      const data = snapshot.val() || {};
-
-      const list = Object.entries(data).map(([key, value]) => ({
-        firebaseKey: key,
-        ...value,
-      }));
-
-      setDrivers(list.filter((d) => d.isActive !== false));
-    });
-
-    return () => {
-      unsubOrders();
-      unsubDrivers();
-    };
-  }, []);
-
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const status = order.orderStatus || "pending";
-      return status === activeTab;
-    });
-  }, [orders, activeTab]);
-
-  const availableDrivers = drivers.filter((d) => d.isAvailable !== false);
-
-  const updateOrderStatus = async (order, status) => {
-    await update(ref(db, `orders/${order.firebaseKey}`), {
-      orderStatus: status,
-      updatedAt: Date.now(),
-    });
-  };
-
-  const openAssignDialog = (order) => {
-    setSelectedOrder(order);
-    setSelectedDriverId(order.driverId || "");
-  };
-
-  const closeAssignDialog = () => {
-    setSelectedOrder(null);
-    setSelectedDriverId("");
-  };
-
-  const assignDriver = async () => {
-    if (!selectedOrder || !selectedDriverId) {
-      alert("اختار الطيار");
-      return;
-    }
-
-    const driver = drivers.find((d) => d.id === selectedDriverId);
-
-    await update(ref(db, `orders/${selectedOrder.firebaseKey}`), {
-      driverId: driver.id,
-      driverName: driver.name,
-      driverPhone: driver.phone,
-      orderStatus: "onDelivery",
-      assignedAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-
-    closeAssignDialog();
-  };
-
-  const orderCounts = (status) =>
-    orders.filter((o) => (o.orderStatus || "pending") === status).length;
-
-  return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">إدارة الطلبات</h1>
-          <p className="page-subtitle">
-            متابعة الطلبات الجديدة وتجهيزها وإسنادها للطيارين.
-          </p>
-        </div>
-      </div>
-
-      <div className="orders-tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={activeTab === tab.key ? "tab-btn active-tab" : "tab-btn"}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-            <span>{orderCounts(tab.key)}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="orders-grid">
-        {filteredOrders.map((order) => (
-          <OrderCard
-            key={order.firebaseKey}
-            order={order}
-            onAccept={() => updateOrderStatus(order, "preparing")}
-            onAssign={() => openAssignDialog(order)}
-            onComplete={() => updateOrderStatus(order, "completed")}
-            onCancel={() => updateOrderStatus(order, "cancelled")}
-          />
-        ))}
-
-        {filteredOrders.length === 0 && (
-          <div className="card empty-orders">لا توجد طلبات في هذا القسم</div>
-        )}
-      </div>
-
-      {selectedOrder && (
-        <div className="modal-overlay" onClick={closeAssignDialog}>
-          <div className="modal-card small-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>إسناد الطلب لطيار</h2>
-              <button onClick={closeAssignDialog}>×</button>
-            </div>
-
-            <select
-              value={selectedDriverId}
-              onChange={(e) => setSelectedDriverId(e.target.value)}
-            >
-              <option value="">اختر الطيار</option>
-              {availableDrivers.map((driver) => (
-                <option key={driver.firebaseKey} value={driver.id}>
-                  {driver.name} - {driver.phone}
-                </option>
-              ))}
-            </select>
-
-            <button style={{ marginTop: 14 }} onClick={assignDriver}>
-              إسناد الطلب
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+const tabs=[{key:"all",label:"كل الطلبات"},{key:"pending",label:"جديدة"},{key:"preparing",label:"جاري التحضير"},{key:"onDelivery",label:"في الطريق"},{key:"completed",label:"مكتملة"},{key:"cancelled",label:"ملغية"}];
+export default function OrdersPage(){
+ const[orders,setOrders]=useState([]),[drivers,setDrivers]=useState([]),[activeTab,setActiveTab]=useState("all"),[query,setQuery]=useState(""),[selectedOrder,setSelectedOrder]=useState(null),[assignOrder,setAssignOrder]=useState(null),[selectedDriverId,setSelectedDriverId]=useState("");
+ useEffect(()=>{const u1=onValue(ref(db,"orders"),s=>{const d=s.val()||{};setOrders(Object.entries(d).map(([firebaseKey,v])=>({firebaseKey,...v})).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0)))});const u2=onValue(ref(db,"drivers"),s=>{const d=s.val()||{};setDrivers(Object.entries(d).map(([firebaseKey,v])=>({firebaseKey,...v})).filter(x=>x.isActive!==false))});return()=>{u1();u2()}},[]);
+ const filtered=useMemo(()=>orders.filter(o=>{const status=o.orderStatus||"pending";const tab=activeTab==="all"||status===activeTab;const q=query.trim().toLowerCase();const search=!q||[o.id,o.firebaseKey,o.customerName,o.customerPhone,o.storeName,o.driverName].some(v=>String(v||"").toLowerCase().includes(q));return tab&&search}),[orders,activeTab,query]);
+ const counts=useMemo(()=>({all:orders.length,pending:orders.filter(o=>(o.orderStatus||"pending")==="pending").length,preparing:orders.filter(o=>o.orderStatus==="preparing").length,onDelivery:orders.filter(o=>o.orderStatus==="onDelivery").length,completed:orders.filter(o=>o.orderStatus==="completed").length,cancelled:orders.filter(o=>o.orderStatus==="cancelled").length}),[orders]);
+ const revenue=orders.filter(o=>o.orderStatus==="completed").reduce((s,o)=>s+Number(o.total||0),0);
+ const changeStatus=(o,status)=>update(ref(db,`orders/${o.firebaseKey}`),{orderStatus:status,updatedAt:Date.now()});
+ const assign=async()=>{if(!assignOrder||!selectedDriverId)return;const d=drivers.find(x=>(x.id||x.firebaseKey)===selectedDriverId);if(!d)return;await update(ref(db,`orders/${assignOrder.firebaseKey}`),{driverId:d.id||d.firebaseKey,driverName:d.name||"",driverPhone:d.phone||"",orderStatus:"onDelivery",assignedAt:Date.now(),updatedAt:Date.now()});setAssignOrder(null);setSelectedDriverId("")};
+ return <div className="v2-page" dir="rtl">
+  <div className="v2-page-head"><div><span className="v2-eyebrow">BRINGO OPERATIONS</span><h1>إدارة كل الطلبات</h1><p>كل طلبات Bringo من أول يوم، مع البحث والمتابعة والتفاصيل الكاملة.</p></div><div className="v2-head-total"><span>إجمالي مبيعات الطلبات المكتملة</span><strong>{revenue.toLocaleString()} ج</strong></div></div>
+  <div className="orders-summary"><Summary icon={ShoppingBag} label="كل الطلبات" value={counts.all}/><Summary icon={Clock3} label="تحتاج متابعة" value={counts.pending+counts.preparing}/><Summary icon={Bike} label="في الطريق" value={counts.onDelivery}/><Summary icon={CheckCircle2} label="مكتملة" value={counts.completed}/><Summary icon={XCircle} label="ملغية" value={counts.cancelled}/></div>
+  <div className="orders-control"><div className="orders-search"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ابحث برقم الطلب، العميل، الهاتف، المتجر أو الطيار..."/></div><div className="filter-label"><Filter size={16}/> {filtered.length} طلب</div></div>
+  <div className="v2-tabs">{tabs.map(t=><button key={t.key} className={activeTab===t.key?"active":""} onClick={()=>setActiveTab(t.key)}>{t.label}<b>{counts[t.key]}</b></button>)}</div>
+  <div className="orders-table-card"><div className="orders-table-wrap"><table className="orders-v2-table"><thead><tr><th>الطلب</th><th>العميل</th><th>المتجر</th><th>الطيار</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th></th></tr></thead><tbody>{filtered.map(o=><tr key={o.firebaseKey}><td><strong>#{String(o.id||o.firebaseKey).slice(-7)}</strong><small>{parseItems(o.items).length} منتجات</small></td><td><strong>{o.customerName||"عميل Bringo"}</strong><small>{o.customerPhone||"—"}</small></td><td>{o.storeName||"—"}</td><td>{o.driverName||"لم يحدد"}</td><td>{formatDate(o.createdAt)}</td><td><strong>{Number(o.total||0).toLocaleString()} ج</strong></td><td><Status status={o.orderStatus}/></td><td><button className="icon-action" onClick={()=>setSelectedOrder(o)}><Eye size={17}/></button></td></tr>)}</tbody></table>{!filtered.length&&<div className="v2-empty">لا توجد طلبات مطابقة</div>}</div></div>
+  {selectedOrder&&<OrderDetails order={selectedOrder} close={()=>setSelectedOrder(null)} changeStatus={changeStatus} assign={()=>{setAssignOrder(selectedOrder);setSelectedOrder(null)}}/>}
+  {assignOrder&&<div className="v2-modal-backdrop" onClick={()=>setAssignOrder(null)}><div className="v2-modal small" onClick={e=>e.stopPropagation()}><div className="v2-modal-head"><h2>إسناد الطلب لطيار</h2><button onClick={()=>setAssignOrder(null)}>×</button></div><select className="v2-select" value={selectedDriverId} onChange={e=>setSelectedDriverId(e.target.value)}><option value="">اختر الطيار</option>{drivers.filter(d=>d.isAvailable!==false).map(d=><option key={d.firebaseKey} value={d.id||d.firebaseKey}>{d.name} — {d.phone}</option>)}</select><button className="v2-primary full" onClick={assign}>تأكيد الإسناد</button></div></div>}
+ </div>
 }
-
-function OrderCard({ order, onAccept, onAssign, onComplete, onCancel }) {
-  const items = parseItems(order.items);
-  const address = order.address || {};
-
-  return (
-    <div className="order-card">
-      <div className="order-card-header">
-        <span className="badge">{statusText(order.orderStatus)}</span>
-        <div>
-          <h3>طلب #{String(order.id || order.firebaseKey).slice(0, 6)}</h3>
-          <p>{formatDate(order.createdAt)}</p>
-        </div>
-      </div>
-
-      <div className="customer-box">
-        <strong>{order.customerName || "عميل Bringo"}</strong>
-        <span>{order.customerPhone || "بدون رقم"}</span>
-        <p>
-          {address.area || ""} - {address.street || ""} - عمارة{" "}
-          {address.building || ""}
-        </p>
-      </div>
-
-      <div className="items-box">
-        {items.map((item, index) => (
-          <div className="order-item" key={index}>
-            <span>x{item.quantity || 1}</span>
-            <strong>{item.name}</strong>
-            <em>{item.price} جنيه</em>
-          </div>
-        ))}
-      </div>
-
-      <div className="order-total">
-        <span>الإجمالي</span>
-        <strong>{Number(order.total || 0).toFixed(0)} جنيه</strong>
-      </div>
-
-      {order.driverName && (
-        <div className="driver-box">
-          <span>الطيار:</span>
-          <strong>
-            {order.driverName} - {order.driverPhone}
-          </strong>
-        </div>
-      )}
-
-      <div className="order-actions">
-        {(order.orderStatus === "pending" || !order.orderStatus) && (
-          <button onClick={onAccept}>قبول الطلب</button>
-        )}
-
-        {order.orderStatus === "preparing" && (
-          <button onClick={onAssign}>إسناد لطيار</button>
-        )}
-
-        {order.orderStatus === "onDelivery" && (
-          <button className="success-btn" onClick={onComplete}>
-            تم التسليم
-          </button>
-        )}
-
-        {order.orderStatus !== "completed" && order.orderStatus !== "cancelled" && (
-          <button className="danger" onClick={onCancel}>
-            إلغاء
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function parseItems(value) {
-  if (!value) return [];
-
-  if (Array.isArray(value)) return value;
-
-  if (typeof value === "object") {
-    return Object.values(value);
-  }
-
-  return [];
-}
-
-function statusText(status) {
-  switch (status) {
-    case "preparing":
-      return "جاري التحضير";
-    case "onDelivery":
-      return "في الطريق";
-    case "completed":
-      return "مكتمل";
-    case "cancelled":
-      return "ملغي";
-    default:
-      return "طلب جديد";
-  }
-}
-
-function formatDate(value) {
-  if (!value) return "";
-  const date = new Date(Number(value));
-  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()} - ${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
+function Summary({icon:Icon,label,value}){return <div className="summary-card"><span><Icon size={19}/></span><div><small>{label}</small><strong>{value}</strong></div></div>}
+function OrderDetails({order,close,changeStatus,assign}){const items=parseItems(order.items),a=order.address||{};return <div className="v2-modal-backdrop" onClick={close}><div className="v2-modal order-detail-modal" onClick={e=>e.stopPropagation()}><div className="v2-modal-head"><div><small>تفاصيل الطلب</small><h2>#{String(order.id||order.firebaseKey).slice(-8)}</h2></div><button onClick={close}>×</button></div><div className="detail-grid"><Detail title="العميل" lines={[order.customerName||"عميل Bringo",order.customerPhone||"بدون رقم"]}/><Detail title="المتجر" lines={[order.storeName||"غير محدد"]}/><Detail title="عنوان التوصيل" lines={[[a.area,a.street,a.building&&`عمارة ${a.building}`].filter(Boolean).join(" - ")||"غير مسجل"]}/><Detail title="الطيار" lines={[order.driverName||"لم يتم الإسناد",order.driverPhone||""]}/></div><div className="detail-items"><h3>المنتجات</h3>{items.map((x,i)=><div key={i}><span>{x.quantity||1} × {x.name||"منتج"}</span><strong>{Number(x.price||0).toLocaleString()} ج</strong></div>)}</div><div className="detail-total"><span>إجمالي الطلب</span><strong>{Number(order.total||0).toLocaleString()} جنيه</strong></div><div className="detail-actions">{(!order.orderStatus||order.orderStatus==="pending")&&<button className="v2-primary" onClick={()=>changeStatus(order,"preparing")}>قبول وبدء التحضير</button>}{order.orderStatus==="preparing"&&<button className="v2-primary" onClick={assign}>إسناد لطيار</button>}{order.orderStatus==="onDelivery"&&<button className="v2-primary" onClick={()=>changeStatus(order,"completed")}>تأكيد التسليم</button>}{order.orderStatus!=="completed"&&order.orderStatus!=="cancelled"&&<button className="v2-danger" onClick={()=>changeStatus(order,"cancelled")}>إلغاء الطلب</button>}</div></div></div>}
+function Detail({title,lines}){return <div className="detail-box"><small>{title}</small>{lines.filter(Boolean).map((x,i)=><strong key={i}>{x}</strong>)}</div>}
+function Status({status}){return <span className={`v2-status s-${status||"pending"}`}>{statusText(status)}</span>}
+function parseItems(v){if(!v)return[];return Array.isArray(v)?v:typeof v==="object"?Object.values(v):[]}
+function statusText(s){return({pending:"جديد",preparing:"جاري التحضير",onDelivery:"في الطريق",completed:"مكتمل",cancelled:"ملغي"})[s]||"جديد"}
+function formatDate(v){if(!v)return"—";return new Date(Number(v)).toLocaleString("ar-EG",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}
