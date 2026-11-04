@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
-import { onValue, ref } from "firebase/database";
+import { onValue, ref, runTransaction } from "firebase/database";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { getFunctions, httpsCallable } from "firebase/functions";
+
 import { CheckCircle2, Clock3, ShieldAlert, WalletCards, XCircle } from "lucide-react";
 import "../admin-v2.css";
 
@@ -29,16 +29,40 @@ export default function WalletTopUpsPage() {
   };
   const review = async (item, decision) => {
     if (!admin || busyId) return;
-    if (!window.confirm("راجع التحويل البنكي. تأكيد " + (decision==="approved"?"الموافقة":"الرفض") + " على " + money(item.amountCents) + "؟")) return;
-    const note = decision==="rejected" ? window.prompt("سبب الرفض", "") : "";
-    if (note===null) return;
-    setBusyId(item.firebaseKey); setError("");
+    const token = await admin.getIdTokenResult();
+    if (token.claims.admin !== true) {setError("الحساب غير مصرح له بالموافقة المالية");return;}
+    const raw = decision==="approved" ? window.prompt("المبلغ المعتمد بالجنيه",String(Number(item.amountCents||0)/100)) : "0";
+    if (raw===null) return;
+    const amount=Number(raw), cents=Math.round(amount*100);
+    if (decision==="approved" && (!Number.isFinite(amount)||amount<1||Math.abs(amount*100-cents)>0.001)) {setError("مبلغ غير صحيح");return;}
+    if (!window.confirm("تأكيد "+(decision==="approved"?"إضافة "+amount+" جنيه":"رفض الطلب")+"؟")) return;
+    setBusyId(item.firebaseKey);setError("");
     try {
-      await httpsCallable(getFunctions(undefined,"us-central1"),"reviewWalletTopUp")({
-        requestId:item.firebaseKey,decision,note
-      });
-    } catch (e) { setError("تعذر اعتماد الطلب: " + (e.message||"راجع الصلاحيات")); }
-    finally { setBusyId(null); }
+      const result=await runTransaction(ref(db),data=>{
+        if (!data || !data.walletTopUpRequests?.[item.firebaseKey]) return;
+        const request=data.walletTopUpRequests[item.firebaseKey];
+        if (request.status!=="pending" || !data.drivers?.[request.driverId]) return;
+        const id=request.driverId;
+        data.driverWallets ||= {};
+        const wallet=data.driverWallets[id] ||= {balanceCents:0,activated:false};
+        const balance=Number(wallet.balanceCents||0);
+        if (!Number.isSafeInteger(balance) || !Number.isSafeInteger(balance+cents)) return;
+        if (decision==="approved") {
+          wallet.balanceCents=balance+cents;wallet.activated=true;wallet.updatedAt=Date.now();
+          data.driverWalletLedger ||= {};
+          data.driverWalletLedger[id] ||= {};
+          data.driverWalletLedger[id]["topup_"+item.firebaseKey]={
+            type:"topup",amountCents:cents,balanceAfterCents:wallet.balanceCents,
+            requestId:item.firebaseKey,approvedBy:admin.uid,createdAt:Date.now()
+          };
+        }
+        request.status=decision;request.approvedAmountCents=decision==="approved"?cents:0;
+        request.reviewedAt=Date.now();request.reviewedBy=admin.uid;
+        return data;
+      },{applyLocally:false});
+      if (!result.committed) throw Error("الطلب تمت مراجعته أو البيانات غير صحيحة");
+    } catch(e) {setError("فشل الاعتماد: "+(e.message||"راجع الصلاحيات"));}
+    finally {setBusyId(null);}
   };
 
   useEffect(() => { if (!admin) {setRequests([]);return;} return onValue(ref(db, "walletTopUpRequests"), snap => {
@@ -81,7 +105,7 @@ export default function WalletTopUpsPage() {
     </div>
 
     <div style={{display:"flex",justifyContent:"space-between",margin:"12px 0"}}>
-      <span>الموافقات تتم عبر Firebase Cloud Functions بصلاحيات المسؤول.</span>
+      <span>اعتماد الرصيد عبر Realtime Database Transaction ويتطلب صلاحية admin.</span>
       <button type="button" onClick={()=>signOut(auth)}>خروج الإدارة المالية</button>
     </div>
     {error&&<p role="alert" style={{color:"#a33",padding:12}}>{error}</p>}
@@ -100,13 +124,14 @@ export default function WalletTopUpsPage() {
     <div style={{overflowX:"auto",background:"white",border:"1px solid #e1e9e3",borderRadius:10}}>
       <table style={{width:"100%",borderCollapse:"collapse",minWidth:760,fontSize:13}}>
         <thead><tr style={{background:"#f7faf8",textAlign:"right"}}>
-          {["الطيار","المبلغ","رقم التحويل منه","رقم العملية","التاريخ","الحالة","الإجراء"].map(h=><th key={h} style={{padding:14,borderBottom:"1px solid #e1e9e3"}}>{h}</th>)}
+          {["الطيار","المبلغ","رقم التحويل منه","رقم العملية","الإيصال","التاريخ","الحالة","الإجراء"].map(h=><th key={h} style={{padding:14,borderBottom:"1px solid #e1e9e3"}}>{h}</th>)}
         </tr></thead>
         <tbody>{filtered.map(r=><tr key={r.firebaseKey}>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}}><strong>{r.driverName || "طيار"}</strong><div>{r.driverPhone || "-"}</div></td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed",fontWeight:700}}>{money(r.amountCents)}</td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}} dir="ltr">{r.senderPhone || "-"}</td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}} dir="ltr">{r.transferReference || "-"}</td>
+          <td style={{padding:14,borderBottom:"1px solid #edf0ed"}}>{r.receiptImageBase64 ? <a href={"data:image/jpeg;base64,"+r.receiptImageBase64} target="_blank" rel="noreferrer">عرض الإيصال</a> : "بدون صورة"}</td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}}>{datetime(r.createdAt)}</td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}}>
             <span style={{color:pillColors[r.status]||pillColors.pending,fontWeight:700}}>
