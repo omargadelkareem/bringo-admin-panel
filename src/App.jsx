@@ -11,6 +11,7 @@ import StoresPage from "./pages/StoresPage";
 import AddStorePage from "./pages/AddStorePage";
 import StoreProductsPage from "./pages/StoreProductsPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import WalletTopUpsPage from "./pages/WalletTopUpsPage";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="restaurants/:restaurantId/products" element={<RestaurantProductsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="drivers" element={<DriversPage />} />
+        <Route path="wallet-topups" element={<WalletTopUpsPage />} />
         <Route path="stores" element={<StoresPage />} />
         <Route path="stores/new" element={<AddStorePage />} />
         <Route path="stores/:storeId/edit" element={<AddStorePage />} />
