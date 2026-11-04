@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
 import { onValue, ref, runTransaction } from "firebase/database";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 
 import { CheckCircle2, Clock3, ShieldAlert, WalletCards, XCircle } from "lucide-react";
 import "../admin-v2.css";
@@ -20,6 +20,14 @@ export default function WalletTopUpsPage() {
   const [previewReceipt, setPreviewReceipt] = useState(null);
   const [admin, setAdmin] = useState(getAuth().currentUser);
   useEffect(() => onAuthStateChanged(getAuth(), setAdmin), []);
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const login = async (e) => {
+    e.preventDefault(); setLoginBusy(true); setError("");
+    try { await signInWithEmailAndPassword(getAuth(), "omarsabry8989@gmail.com", loginPassword); setLoginPassword(""); }
+    catch (e) { setError("تعذر تسجيل الدخول: " + e.message); }
+    finally { setLoginBusy(false); }
+  };
   const review = async (item, decision) => {
     if (busyId) return;
     if (!admin) { setError("سجّل دخول المدير إلى Firebase أولًا."); return; }
@@ -92,6 +100,7 @@ export default function WalletTopUpsPage() {
       <span>عرض الطلبات متاح مباشرة. اعتماد الرصيد يحتاج صلاحيات إدارة مالية آمنة في Firebase.</span>
 
     </div>
+    {!admin && <form onSubmit={login} style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}><input type="password" autoComplete="current-password" required value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="كلمة مرور مدير Bringo" style={{padding:10,border:"1px solid #ddd",borderRadius:8}}/><button type="submit" disabled={loginBusy} style={{padding:10,background:"#176d4d",color:"#fff",borderRadius:8}}>{loginBusy?"جارٍ التحقق...":"تفعيل الموافقات"}</button></form>}
     {error&&<p role="alert" style={{color:"#a33",padding:12}}>{error}</p>}
     <div className="product-toolbar" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
       <div className="product-search" style={{flex:"1 1 260px"}}>
