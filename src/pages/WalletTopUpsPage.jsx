@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
 import { onValue, ref, runTransaction } from "firebase/database";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 import { CheckCircle2, Clock3, ShieldAlert, WalletCards, XCircle } from "lucide-react";
 import "../admin-v2.css";
@@ -18,10 +18,11 @@ export default function WalletTopUpsPage() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const [previewReceipt, setPreviewReceipt] = useState(null);
-  const admin = getAuth().currentUser;
+  const [admin, setAdmin] = useState(getAuth().currentUser);
+  useEffect(() => onAuthStateChanged(getAuth(), setAdmin), []);
   const review = async (item, decision) => {
     if (busyId) return;
-    if (!admin) { setError("أزرار المراجعة ظاهرة، لكن اعتماد الرصيد يتطلب صلاحية إدارة موثوقة. لا يمكن إضافة رصيد بأمان من جلسة غير موثقة."); return; }
+    if (!admin) { setError("سجّل دخول المدير إلى Firebase أولًا."); return; }
     const token = await admin.getIdTokenResult();
     if (token.claims.admin !== true) {setError("الحساب غير مصرح له بالموافقة المالية");return;}
     const raw = decision==="approved" ? window.prompt("المبلغ المعتمد بالجنيه",String(Number(item.amountCents||0)/100)) : "0";
