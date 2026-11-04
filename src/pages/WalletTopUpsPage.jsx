@@ -23,8 +23,7 @@ export default function WalletTopUpsPage() {
   const review = async (item, decision) => {
     if (busyId) return;
     if (!admin) { setError("سجّل دخول المدير إلى Firebase أولًا."); return; }
-    const token = await admin.getIdTokenResult();
-    if (token.claims.admin !== true) {setError("الحساب غير مصرح له بالموافقة المالية");return;}
+    if (admin.uid !== "uOzN1xhHcxa2HG2uFY16TffumXC2") { setError("الحساب الحالي ليس حساب مدير Bringo"); return; }
     const raw = decision==="approved" ? window.prompt("المبلغ المعتمد بالجنيه",String(Number(item.amountCents||0)/100)) : "0";
     if (raw===null) return;
     const amount=Number(raw), cents=Math.round(amount*100);
