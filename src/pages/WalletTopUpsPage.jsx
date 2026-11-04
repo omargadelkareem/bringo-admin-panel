@@ -42,7 +42,7 @@ export default function WalletTopUpsPage() {
       const result=await runTransaction(ref(db),data=>{
         if (!data || !data.walletTopUpRequests?.[item.firebaseKey]) return;
         const request=data.walletTopUpRequests[item.firebaseKey];
-        if (request.status!=="pending" || !data.drivers?.[request.driverId]) return;
+        if ((request.status || "pending") !== "pending" || !request.driverId || typeof request.driverId !== "string") return;
         const id=request.driverId;
         data.driverWallets ||= {};
         const wallet=data.driverWallets[id] ||= {balanceCents:0,activated:false};
