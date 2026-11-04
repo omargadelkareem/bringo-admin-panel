@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
 import { onValue, ref, runTransaction } from "firebase/database";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getAuth } from "firebase/auth";
 
 import { CheckCircle2, Clock3, ShieldAlert, WalletCards, XCircle } from "lucide-react";
 import "../admin-v2.css";
@@ -15,18 +15,9 @@ export default function WalletTopUpsPage() {
   const [requests, setRequests] = useState([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("pending");
-  const [admin, setAdmin] = useState(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
-  const auth = getAuth();
-  useEffect(() => onAuthStateChanged(auth, setAdmin), [auth]);
-  const login = async e => {
-    e.preventDefault(); setError("");
-    try { await signInWithEmailAndPassword(auth,email,password); setPassword(""); }
-    catch (_) { setError("تعذر تسجيل دخول الإدارة المالية."); }
-  };
+  const [error, setError] = useState("");
+  const admin = getAuth().currentUser;
   const review = async (item, decision) => {
     if (!admin || busyId) return;
     const token = await admin.getIdTokenResult();
@@ -65,12 +56,12 @@ export default function WalletTopUpsPage() {
     finally {setBusyId(null);}
   };
 
-  useEffect(() => { if (!admin) {setRequests([]);return;} return onValue(ref(db, "walletTopUpRequests"), snap => {
+  useEffect(() => onValue(ref(db, "walletTopUpRequests"), snap => {
     const data = snap.val() || {};
     setRequests(Object.entries(data).filter(([,v]) => v && typeof v === "object")
       .map(([key,v]) => ({ ...v, firebaseKey:key }))
       .sort((a,b) => Number(b.createdAt || 0)-Number(a.createdAt || 0)));
-  }); }, [admin]);
+  }), []);
 
   const filtered = useMemo(() => requests.filter(r => {
     const matchesStatus = status === "all" || (r.status || "pending") === status;
@@ -82,15 +73,6 @@ export default function WalletTopUpsPage() {
 
   const pending = requests.filter(r => (r.status || "pending") === "pending").length;
 
-  if (!admin) return <div className="catalog-page" dir="rtl" style={{maxWidth:500,margin:"40px auto"}}>
-    <div className="catalog-heading"><div><span>FINANCE ACCESS</span><h1>دخول الإدارة المالية</h1><p>خاص بالموافقات المالية فقط. دخول الكابتن بالكود لم يتغير.</p></div></div>
-    <form onSubmit={login} style={{background:"white",padding:24,borderRadius:16,display:"grid",gap:12}}>
-      <label>البريد الإلكتروني<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} style={{display:"block",width:"100%",padding:12}}/></label>
-      <label>كلمة المرور<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} style={{display:"block",width:"100%",padding:12}}/></label>
-      {error&&<p role="alert" style={{color:"#a33"}}>{error}</p>}
-      <button className="product-primary">تسجيل الدخول</button>
-    </form>
-  </div>;
   return <div className="catalog-page" dir="rtl" style={{maxWidth:1100}}>
     <div className="catalog-heading"><div>
       <span>DRIVER WALLET OPERATIONS</span>
@@ -105,8 +87,8 @@ export default function WalletTopUpsPage() {
     </div>
 
     <div style={{display:"flex",justifyContent:"space-between",margin:"12px 0"}}>
-      <span>اعتماد الرصيد عبر Realtime Database Transaction ويتطلب صلاحية admin.</span>
-      <button type="button" onClick={()=>signOut(auth)}>خروج الإدارة المالية</button>
+      <span>عرض الطلبات متاح مباشرة. اعتماد الرصيد يحتاج صلاحيات إدارة مالية آمنة في Firebase.</span>
+
     </div>
     {error&&<p role="alert" style={{color:"#a33",padding:12}}>{error}</p>}
     <div className="product-toolbar" style={{display:"flex",gap:10,flexWrap:"wrap"}}>
@@ -140,10 +122,10 @@ export default function WalletTopUpsPage() {
             </span>
           </td>
           <td style={{padding:12,borderBottom:"1px solid #edf0ed"}}>
-            {r.status==="pending" ? <div style={{display:"flex",gap:6}}>
+            {r.status==="pending" && admin ? <div style={{display:"flex",gap:6}}>
               <button type="button" disabled={Boolean(busyId)} onClick={()=>review(r,"approved")} style={{background:"#176d4d",color:"white",padding:"8px 12px",borderRadius:8}}>موافقة</button>
               <button type="button" disabled={Boolean(busyId)} onClick={()=>review(r,"rejected")} style={{background:"#fff0f0",color:"#a33838",padding:"8px 12px",borderRadius:8}}>رفض</button>
-            </div> : "تمت المراجعة"}
+            </div> : r.status==="pending" ? "بانتظار صلاحية الاعتماد" : "تمت المراجعة"}
           </td>
         </tr>)}</tbody>
       </table>
