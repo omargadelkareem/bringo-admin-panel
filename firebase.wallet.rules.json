@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "walletTopUpRequests": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false,
+      ".indexOn": [
+        "driverId"
+      ]
+    },
+    "driverWallets": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false
+    },
+    "driverWalletLedger": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false
+    },
+    "walletChargeExceptions": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false
+    }
+  }
+}
