@@ -17,9 +17,11 @@ export default function WalletTopUpsPage() {
   const [status, setStatus] = useState("pending");
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
+  const [previewReceipt, setPreviewReceipt] = useState(null);
   const admin = getAuth().currentUser;
   const review = async (item, decision) => {
-    if (!admin || busyId) return;
+    if (busyId) return;
+    if (!admin) { setError("أزرار المراجعة ظاهرة، لكن اعتماد الرصيد يتطلب صلاحية إدارة موثوقة. لا يمكن إضافة رصيد بأمان من جلسة غير موثقة."); return; }
     const token = await admin.getIdTokenResult();
     if (token.claims.admin !== true) {setError("الحساب غير مصرح له بالموافقة المالية");return;}
     const raw = decision==="approved" ? window.prompt("المبلغ المعتمد بالجنيه",String(Number(item.amountCents||0)/100)) : "0";
@@ -113,7 +115,11 @@ export default function WalletTopUpsPage() {
           <td style={{padding:14,borderBottom:"1px solid #edf0ed",fontWeight:700}}>{money(r.amountCents)}</td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}} dir="ltr">{r.senderPhone || "-"}</td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}} dir="ltr">{r.transferReference || "-"}</td>
-          <td style={{padding:14,borderBottom:"1px solid #edf0ed"}}>{r.receiptImageBase64 ? <a href={"data:image/jpeg;base64,"+r.receiptImageBase64} target="_blank" rel="noreferrer">عرض الإيصال</a> : "بدون صورة"}</td>
+          <td style={{padding:12,borderBottom:"1px solid #edf0ed"}}>
+            {r.receiptImageBase64 ? <button type="button" onClick={()=>setPreviewReceipt("data:image/jpeg;base64,"+r.receiptImageBase64)} title="تكبير الإيصال داخل الصفحة" style={{border:"none",background:"transparent",cursor:"zoom-in",padding:0}}>
+              <img src={"data:image/jpeg;base64,"+r.receiptImageBase64} alt={"إيصال تحويل "+(r.driverName||"الطيار")} style={{width:160,height:130,objectFit:"contain",borderRadius:10,border:"1px solid #dce5df",background:"#f8faf9"}}/>
+            </button> : <span>لم يرفق إيصال</span>}
+          </td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}}>{datetime(r.createdAt)}</td>
           <td style={{padding:14,borderBottom:"1px solid #edf0ed"}}>
             <span style={{color:pillColors[r.status]||pillColors.pending,fontWeight:700}}>
@@ -122,14 +128,18 @@ export default function WalletTopUpsPage() {
             </span>
           </td>
           <td style={{padding:12,borderBottom:"1px solid #edf0ed"}}>
-            {r.status==="pending" && admin ? <div style={{display:"flex",gap:6}}>
+            {r.status==="pending" ? <div style={{display:"flex",gap:6}}>
               <button type="button" disabled={Boolean(busyId)} onClick={()=>review(r,"approved")} style={{background:"#176d4d",color:"white",padding:"8px 12px",borderRadius:8}}>موافقة</button>
               <button type="button" disabled={Boolean(busyId)} onClick={()=>review(r,"rejected")} style={{background:"#fff0f0",color:"#a33838",padding:"8px 12px",borderRadius:8}}>رفض</button>
-            </div> : r.status==="pending" ? "بانتظار صلاحية الاعتماد" : "تمت المراجعة"}
+            </div> : "تمت المراجعة"}
           </td>
         </tr>)}</tbody>
       </table>
       {!filtered.length&&<p style={{padding:22,textAlign:"center",color:"#65756f"}}>لا توجد طلبات مطابقة.</p>}
     </div>
+    {previewReceipt && <div role="dialog" aria-modal="true" aria-label="معاينة إيصال التحويل" onClick={()=>setPreviewReceipt(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.78)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,cursor:"zoom-out"}}>
+      <button type="button" onClick={()=>setPreviewReceipt(null)} aria-label="إغلاق الصورة" style={{position:"absolute",top:18,left:20,border:0,borderRadius:8,padding:"10px 16px",cursor:"pointer"}}>إغلاق ×</button>
+      <img src={previewReceipt} alt="صورة إيصال التحويل بالحجم الكبير" onClick={e=>e.stopPropagation()} style={{maxWidth:"95vw",maxHeight:"88vh",objectFit:"contain",borderRadius:12,cursor:"default"}}/>
+    </div>}
   </div>;
 }
