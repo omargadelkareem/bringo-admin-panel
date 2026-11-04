@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
-import { onValue, ref, runTransaction } from "firebase/database";
+import { get, onValue, ref, runTransaction } from "firebase/database";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 
 import { CheckCircle2, Clock3, ShieldAlert, WalletCards, XCircle } from "lucide-react";
@@ -39,15 +39,22 @@ export default function WalletTopUpsPage() {
     if (!window.confirm("تأكيد "+(decision==="approved"?"إضافة "+amount+" جنيه":"رفض الطلب")+"؟")) return;
     setBusyId(item.firebaseKey);setError("");
     try {
-      const result=await runTransaction(ref(db),data=>{
-        if (!data || !data.walletTopUpRequests?.[item.firebaseKey]) return;
+      // RTDB transactions can receive null on the first local invocation when root is not cached.
+      // Preload the current root so a legitimate pending request is not aborted prematurely.
+      const rootRef = ref(db);
+      await get(rootRef);
+      let abortReason = "بيانات الطلب غير متاحة";
+      const result=await runTransaction(rootRef,data=>{
+        if (!data) { abortReason = "تعذر قراءة بيانات قاعدة البيانات"; return; }
+        if (!data.walletTopUpRequests?.[item.firebaseKey]) { abortReason = "طلب الشحن غير موجود في قاعدة البيانات"; return; }
         const request=data.walletTopUpRequests[item.firebaseKey];
-        if ((request.status || "pending") !== "pending" || !request.driverId || typeof request.driverId !== "string") return;
+        if ((request.status || "pending") !== "pending") { abortReason = "حالة الطلب الحالية: " + request.status; return; }
+        if (!request.driverId || typeof request.driverId !== "string") { abortReason = "طلب الشحن لا يحتوي على معرّف الطيار"; return; }
         const id=request.driverId;
         data.driverWallets ||= {};
         const wallet=data.driverWallets[id] ||= {balanceCents:0,activated:false};
         const balance=Number(wallet.balanceCents||0);
-        if (!Number.isSafeInteger(balance) || !Number.isSafeInteger(balance+cents)) return;
+        if (!Number.isSafeInteger(balance) || !Number.isSafeInteger(balance+cents)) { abortReason = "رصيد المحفظة غير صالح"; return; }
         if (decision==="approved") {
           wallet.balanceCents=balance+cents;wallet.activated=true;wallet.updatedAt=Date.now();
           data.driverWalletLedger ||= {};
@@ -61,7 +68,7 @@ export default function WalletTopUpsPage() {
         request.reviewedAt=Date.now();request.reviewedBy=admin.uid;
         return data;
       },{applyLocally:false});
-      if (!result.committed) throw Error("الطلب تمت مراجعته أو البيانات غير صحيحة");
+      if (!result.committed) throw Error(abortReason);
     } catch(e) {setError("فشل الاعتماد: "+(e.message||"راجع الصلاحيات"));}
     finally {setBusyId(null);}
   };
