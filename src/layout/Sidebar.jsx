@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, Plus, BellRing, X } from "lucide-react";
+import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, Plus, BellRing, X, WalletCards } from "lucide-react";
 
 const primary=[
  {to:"/dashboard",label:"نظرة عامة",icon:LayoutGrid},
  {to:"/orders",label:"الطلبات",icon:ReceiptText},
  {to:"/drivers",label:"الطيارين",icon:Bike},
+  {to:"/wallet-topups",label:"شحن المحافظ",icon:WalletCards},
  {to:"/stores",label:"المتاجر",icon:Store},
  {to:"/stores/new",label:"إضافة متجر",icon:Plus},
 ];
