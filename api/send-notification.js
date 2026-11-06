@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import admin from "firebase-admin";
 
 function initialize() {
@@ -9,11 +10,12 @@ function initialize() {
   if(!projectId||!clientEmail||!privateKey||!databaseURL)throw new Error("Firebase Admin environment is incomplete");
   return admin.initializeApp({credential:admin.credential.cert({projectId,clientEmail,privateKey}),databaseURL});
 }
-async function authorize(req){
-  const token=/^Bearer (.+)$/.exec(req.headers.authorization||"")?.[1];
-  if(!token)return false;
-  const claims=await admin.auth().verifyIdToken(token);
-  return claims.admin===true;
+function authorize(req){
+  const expected=process.env.BRINGO_NOTIFICATION_SEND_CODE;
+  const provided=/^Bearer (.+)$/.exec(req.headers.authorization||"")?.[1];
+  if(!expected||!provided)return false;
+  const a=Buffer.from(provided),b=Buffer.from(expected);
+  return a.length===b.length&&timingSafeEqual(a,b);
 }
 function tokensOf(user){
   return [...new Set([user?.fcmToken,...(Array.isArray(user?.fcmTokens)?user.fcmTokens:Object.values(user?.fcmTokens||{}))].filter(v=>typeof v==="string"&&v.length>30))];
@@ -22,7 +24,7 @@ export default async function handler(req,res){
   if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
   try{
     initialize();
-    if(!await authorize(req))return res.status(403).json({error:"Admin Firebase Auth required"});
+    if(!authorize(req))return res.status(403).json({error:"كود إرسال الإشعارات غير صحيح. حاول مرة أخرى."});
     const {userId,title,body}=req.body||{};
     if(typeof title!=="string"||typeof body!=="string"||!title.trim()||!body.trim()||title.length>80||body.length>300)return res.status(400).json({error:"Invalid notification content"});
     const broadcast=req.url?.includes("send-notification-all");
