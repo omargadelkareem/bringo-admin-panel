@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { getAuth } from "firebase/auth";
 import { AlertTriangle, BellRing, CheckCircle2, Send, Smartphone, UserRound, UsersRound, XCircle } from "lucide-react";
 
 const API_BASE = "";
@@ -27,11 +26,15 @@ export default function NotificationsPage() {
       const endpoint = isBroadcast ? "/api/send-notification-all" : "/api/send-notification";
       const requestBody = { title: title.trim(), body: body.trim(), data: { source: "admin" } };
       if (!isBroadcast) requestBody.userId = userId.trim();
-      const user = getAuth().currentUser;
-      if (!user) throw new Error("يلزم تسجيل دخول الأدمن بحساب Firebase Auth قبل إرسال الإشعارات.");
-      const token = await user.getIdToken();
+      let token = sessionStorage.getItem("bringo_notification_send_code");
+      if (!token) {
+        token = window.prompt("أدخل كود إرسال الإشعارات (مرة واحدة خلال الجلسة):")?.trim();
+        if (!token) throw new Error("تم إلغاء الإرسال: كود الإرسال مطلوب.");
+        sessionStorage.setItem("bringo_notification_send_code", token);
+      }
       const response = await fetch(`${API_BASE}${endpoint}`, { method:"POST", headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`}, body:JSON.stringify(requestBody) });
       const payload = await response.json().catch(()=>({}));
+      if (response.status === 401 || response.status === 403) sessionStorage.removeItem("bringo_notification_send_code");
       if (!response.ok) throw new Error(payload.error || `فشل إرسال الإشعار (${response.status})`);
       const successCount=Number(payload.successCount||0), failureCount=Number(payload.failureCount||0), deviceCount=Number(payload.deviceCount??(successCount+failureCount)), errors=Array.isArray(payload.errors)?payload.errors:[];
       setResult({type:payload.ok&&successCount>0?"success":"error",isBroadcast,successCount,failureCount,deviceCount,usersWithTokens:Number(payload.usersWithTokens||0),registeredCustomers:Number(payload.registeredCustomers||0),notificationId:payload.notificationId||"",errors});
