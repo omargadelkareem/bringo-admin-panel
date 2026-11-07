@@ -28,6 +28,8 @@ const emptyForm = {
   type: "restaurant",
   phone: "",
   address: "",
+  latitude: "",
+  longitude: "",
   deliveryZoneId: "",
   image: "",
   tags: "",
@@ -61,6 +63,8 @@ export default function AddStorePage() {
     if (!form.phone.trim()) return setError("اكتب رقم هاتف المتجر");
     if (!form.address.trim()) return setError("اكتب عنوان المتجر");
     if (!form.deliveryZoneId) return setError("حدد منطقة توصيل المتجر");
+    const lat = Number(form.latitude), lng = Number(form.longitude);
+    if (!form.latitude || !form.longitude || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) return setError("حدد إحداثيات المتجر الصحيحة لحساب رسوم التوصيل");
 
     try {
       setSaving(true);
@@ -73,6 +77,8 @@ export default function AddStorePage() {
         type: form.type,
         phone: form.phone.trim(),
         address: form.address.trim(),
+        latitude: lat,
+        longitude: lng,
         deliveryZoneId: form.deliveryZoneId,
         deliveryZoneName: zones[form.deliveryZoneId],
         image: form.image,
@@ -119,6 +125,24 @@ export default function AddStorePage() {
           ))}
         </div>
 
+        <div style={{ ...sectionTitle, marginTop: 26 }}><MapPin size={18}/> موقع المتجر على الخريطة</div>
+        <p style={{ color: "#697773", fontSize: 12 }}>افتح خرائط OpenStreetMap، اضغط مطولاً على موقع المتجر وانسخ خط العرض وخط الطول. أو استخدم موقعي الحالي لو أنت داخل المتجر.</p>
+        <div style={gridStyle}>
+          <Field label="خط العرض Latitude *"><input style={inputStyle} type="number" step="any" value={form.latitude} onChange={e => change("latitude", e.target.value)} placeholder="26.55..." /></Field>
+          <Field label="خط الطول Longitude *"><input style={inputStyle} type="number" step="any" value={form.longitude} onChange={e => change("longitude", e.target.value)} placeholder="31.69..." /></Field>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+          <button type="button" style={secondaryButton} onClick={() => window.open("https://www.openstreetmap.org/", "_blank", "noopener,noreferrer")}>فتح الخريطة</button>
+          <button type="button" style={secondaryButton} onClick={() => {
+            if (!navigator.geolocation) return setError("المتصفح لا يدعم تحديد الموقع");
+            navigator.geolocation.getCurrentPosition(
+              pos => { setForm(prev => ({ ...prev, latitude: String(pos.coords.latitude), longitude: String(pos.coords.longitude) })); setError(""); },
+              () => setError("تعذر تحديد الموقع. تأكد من السماح للموقع أو أدخل الإحداثيات يدويًا"),
+              { enableHighAccuracy: true, timeout: 15000 }
+            );
+          }}>استخدام موقعي الحالي</button>
+        </div>
+        {form.latitude && form.longitude && Number.isFinite(Number(form.latitude)) && Number.isFinite(Number(form.longitude)) && <iframe title="معاينة موقع المتجر" style={{ width: "100%", height: 250, border: "1px solid #d8e2de", borderRadius: 12, marginTop: 14 }} loading="lazy" src={`https://www.openstreetmap.org/export/embed.html?marker=${encodeURIComponent(form.latitude)},${encodeURIComponent(form.longitude)}&layer=mapnik`} />}
         <div style={{ ...sectionTitle, marginTop: 26 }}><ImagePlus size={18}/> تفاصيل إضافية</div>
         <div style={gridStyle}>
           <Field label="صورة / لوجو المتجر"><input type="file" accept="image/*" onChange={handleImage} /></Field>
