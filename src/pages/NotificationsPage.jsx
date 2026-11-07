@@ -52,7 +52,7 @@ export default function NotificationsPage() {
       <label>نص الإشعار<textarea value={body} onChange={e=>setBody(e.target.value)} rows={5} maxLength={300} style={{display:"block",width:"100%",padding:12,marginTop:7,resize:"vertical"}}/></label>
       <button disabled={!canSend} style={{padding:14,border:0,borderRadius:11,background:"#167a55",color:"white",fontWeight:900,opacity:canSend?1:.5}}><Send size={17}/> {sending?"جاري الإرسال...":"إرسال الإشعار"}</button>
       {result?.type==="success"&&<div style={{padding:14,background:"#eaf8f1",color:"#176443",borderRadius:10}}><CheckCircle2 size={18}/> تم الإرسال إلى {result.successCount} جهاز. {result.failureCount>0&&`فشل ${result.failureCount}.`}</div>}
-      {result?.type==="error"&&<div style={{padding:14,background:"#fff1f0",color:"#b42318",borderRadius:10}}><XCircle size={18}/> {result.message||"لم يتم إرسال الإشعار."}</div>}
+      {result?.type==="error"&&<div style={{padding:14,background:"#fff1f0",color:"#b42318",borderRadius:10}}><XCircle size={18}/> {result.message || (result.errors?.[0]?.code === "NO_TOKENS" ? `لا توجد أجهزة مسجلة لاستقبال الإشعارات (العملاء: ${result.registeredCustomers}، الأجهزة: ${result.deviceCount}). يجب حفظ FCM token من تطبيق العميل في قاعدة البيانات.` : result.errors?.length ? `فشل إرسال الإشعار: ${result.errors.map(e=>`${e.code}: ${e.message}`).join(" | ")} (نجح: ${result.successCount}، فشل: ${result.failureCount}، الأجهزة: ${result.deviceCount})` : `لم يتم إرسال الإشعار. العملاء: ${result.registeredCustomers}، الأجهزة: ${result.deviceCount}، نجح: ${result.successCount}، فشل: ${result.failureCount}.`)}</div>}
       <small style={{color:"#7a8581"}}><Smartphone size={14}/> يجب أن يكون تطبيق العميل مسجلاً FCM token.</small>
     </form>
   </div>;
