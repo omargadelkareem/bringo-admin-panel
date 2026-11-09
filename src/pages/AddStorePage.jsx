@@ -161,7 +161,7 @@ export default function AddStorePage() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 26, paddingTop: 20, borderTop: "1px solid #e8eeeb" }}>
           <button type="button" onClick={() => navigate("/stores")} style={secondaryButton}>إلغاء</button>
-          <button type="submit" disabled={saving} style={{ ...primaryButton, opacity: saving ? .65 : 1 }}><Save size={17}/>{saving ? "جاري إضافة المتجر..." : {isEdit ? "حفظ التعديلات" : "حفظ وفتح المنتجات"}}</button>
+          <button type="submit" disabled={saving} style={{ ...primaryButton, opacity: saving ? .65 : 1 }}><Save size={17}/>{saving ? "جاري الحفظ..." : isEdit ? "حفظ التعديلات" : "حفظ وفتح المنتجات"}</button>
         </div>
       </form>
     </div>
