@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLayout from "./layout/AdminLayout";
 import Dashboard from "./pages/Dashboard";
 import OrdersPage from "./pages/OrdersPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import BannersPage from "./pages/BannersPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -18,6 +19,7 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="orders" element={<OrdersPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="products" element={<Navigate to="/stores" replace />} />
         <Route path="restaurants/:restaurantId/products" element={<RestaurantProductsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
