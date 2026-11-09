@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { push, ref, set } from "firebase/database";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { get, push, ref, set, update } from "firebase/database";
 import { ArrowRight, ImagePlus, MapPin, Save, Store } from "lucide-react";
 import { db } from "../firebase";
 import "../admin-v2.css";
@@ -39,9 +39,13 @@ const emptyForm = {
 
 export default function AddStorePage() {
   const navigate = useNavigate();
+  const { storeId } = useParams();
+  const isEdit = Boolean(storeId);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(isEdit);
+  useEffect(() => { if (!storeId) return; let active = true; get(ref(db, `stores/${storeId}`)).then(snapshot => { if (!snapshot.exists()) throw new Error("المتجر غير موجود"); const value = snapshot.val(); if (active) setForm({...emptyForm,...value, latitude: String(value.latitude ?? value.location?.latitude ?? ""), longitude: String(value.longitude ?? value.location?.longitude ?? "")}); }).catch(e => { if(active) setError(e.message || "تعذر تحميل المتجر"); }).finally(() => {if(active) setLoading(false);}); return () => {active=false}; }, [storeId]);
 
   const change = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -68,10 +72,10 @@ export default function AddStorePage() {
 
     try {
       setSaving(true);
-      const storeRef = push(ref(db, "stores"));
-      const id = storeRef.key;
+      const storeRef = isEdit ? ref(db, `stores/${storeId}`) : push(ref(db, "stores"));
+      const id = storeId || storeRef.key;
       const now = Date.now();
-      await set(storeRef, {
+      const data = {
         id,
         name: form.name.trim(),
         type: form.type,
@@ -86,10 +90,10 @@ export default function AddStorePage() {
         description: form.description.trim(),
         isOpen: form.isOpen,
         acceptsOrders: form.isOpen,
-        createdAt: now,
         updatedAt: now,
-      });
-      navigate(`/stores/${id}/products`);
+      };
+      if (isEdit) { await update(storeRef, data); navigate("/stores"); }
+      else { await set(storeRef, {...data, createdAt: now}); navigate(`/stores/${id}/products`); }
     } catch (e) {
       console.error("Add store error:", e);
       setError(`تعذر إضافة المتجر${e?.code ? ` (${e.code})` : ""}`);
@@ -98,13 +102,14 @@ export default function AddStorePage() {
     }
   };
 
+  if (loading) return <div dir="rtl" style={{padding:28}}>جاري تحميل بيانات المتجر...</div>;
   return (
     <div dir="rtl" style={{ padding: "28px", maxWidth: 1050, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 22 }}>
         <div>
-          <small style={{ color: "#167a55", fontWeight: 900 }}>NEW PARTNER</small>
-          <h1 style={{ margin: "5px 0 6px", color: "#17312a" }}>إضافة متجر جديد</h1>
-          <p style={{ margin: 0, color: "#697773" }}>سجّل بيانات المتجر، وبعد الحفظ هنفتح صفحة المنتجات مباشرة.</p>
+          <small style={{ color: "#167a55", fontWeight: 900 }}>{isEdit ? "EDIT PARTNER" : "NEW PARTNER"}</small>
+          <h1 style={{ margin: "5px 0 6px", color: "#17312a" }}>{isEdit ? "تعديل بيانات المتجر" : "إضافة متجر جديد"}</h1>
+          <p style={{ margin: 0, color: "#697773" }}>{isEdit ? "عدّل بيانات المتجر وموقعه." : "سجّل بيانات المتجر، وبعد الحفظ هنفتح صفحة المنتجات مباشرة."}</p>
         </div>
         <button type="button" onClick={() => navigate("/stores")} style={secondaryButton}><ArrowRight size={17}/> رجوع للمتاجر</button>
       </div>
@@ -156,7 +161,7 @@ export default function AddStorePage() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 26, paddingTop: 20, borderTop: "1px solid #e8eeeb" }}>
           <button type="button" onClick={() => navigate("/stores")} style={secondaryButton}>إلغاء</button>
-          <button type="submit" disabled={saving} style={{ ...primaryButton, opacity: saving ? .65 : 1 }}><Save size={17}/>{saving ? "جاري إضافة المتجر..." : "حفظ وفتح المنتجات"}</button>
+          <button type="submit" disabled={saving} style={{ ...primaryButton, opacity: saving ? .65 : 1 }}><Save size={17}/>{saving ? "جاري إضافة المتجر..." : "{isEdit ? "حفظ التعديلات" : "حفظ وفتح المنتجات"}"}</button>
         </div>
       </form>
     </div>
