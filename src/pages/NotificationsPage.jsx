@@ -1,3 +1,4 @@
+import "../notifications.css";
 import { useMemo, useState } from "react";
 import { AlertTriangle, BellRing, CheckCircle2, Send, Smartphone, UserRound, UsersRound, XCircle } from "lucide-react";
 
