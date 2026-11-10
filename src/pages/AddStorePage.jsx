@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { get, push, ref, set, update } from "firebase/database";
 import { ArrowRight, ImagePlus, MapPin, Save, Store } from "lucide-react";
@@ -6,7 +6,6 @@ import { db } from "../firebase";
 import "../admin-v2.css";
 
 const MAP_CENTER = { lat: 26.5569, lng: 31.6948 };
-const mapUrl = (lat, lng) => `https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.025}%2C${lat-0.018}%2C${lng+0.025}%2C${lat+0.018}&layer=mapnik&marker=${lat}%2C${lng}`;
 
 
 const types = {
@@ -51,6 +50,53 @@ export default function AddStorePage() {
   const [loading, setLoading] = useState(isEdit);
   const [mapOpen, setMapOpen] = useState(false);
   const [mapError, setMapError] = useState(false);
+  const mapElement = useRef(null);
+  const mapInstance = useRef(null);
+  const markerInstance = useRef(null);
+  const onPick = useRef(null);
+  onPick.current = ({ lat, lng }) => { setForm(prev => ({ ...prev, latitude: lat.toFixed(6), longitude: lng.toFixed(6) })); setError(""); };
+  useEffect(() => {
+    if (!mapOpen || !mapElement.current) return;
+    let cancelled = false;
+    const initialize = async () => {
+      try {
+        if (!document.getElementById("bringo-leaflet-css")) {
+          const css = document.createElement("link"); css.id = "bringo-leaflet-css"; css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
+        }
+        if (!window.L) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement("script"); script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.onload = resolve; script.onerror = () => reject(new Error("Map library unavailable")); document.head.appendChild(script);
+          });
+        }
+        if (cancelled || !mapElement.current || mapInstance.current) return;
+        const L = window.L;
+        const lat = Number(form.latitude), lng = Number(form.longitude);
+        const valid = form.latitude !== "" && form.longitude !== "" && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+        const center = valid ? [lat, lng] : [MAP_CENTER.lat, MAP_CENTER.lng];
+        const map = L.map(mapElement.current).setView(center, valid ? 16 : 12);
+        mapInstance.current = map;
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 19 }).addTo(map);
+        if (valid) markerInstance.current = L.marker(center).addTo(map);
+        map.on("click", event => {
+          const position = event.latlng;
+          if (markerInstance.current) markerInstance.current.setLatLng(position);
+          else markerInstance.current = L.marker(position).addTo(map);
+          onPick.current(position);
+        });
+        setTimeout(() => { if (!cancelled) map.invalidateSize(); }, 100);
+      } catch { if (!cancelled) setMapError(true); }
+    };
+    initialize();
+    return () => { cancelled = true; if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; markerInstance.current = null; } };
+  }, [mapOpen]);
+  useEffect(() => {
+    const lat = Number(form.latitude), lng = Number(form.longitude);
+    if (!mapInstance.current || !form.latitude || !form.longitude || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+    const L = window.L;
+    if (markerInstance.current) markerInstance.current.setLatLng([lat, lng]);
+    else markerInstance.current = L.marker([lat, lng]).addTo(mapInstance.current);
+    mapInstance.current.panTo([lat, lng]);
+  }, [form.latitude, form.longitude]);
   useEffect(() => { if (!storeId) return; let active = true; get(ref(db, `stores/${storeId}`)).then(snapshot => { if (!snapshot.exists()) throw new Error("المتجر غير موجود"); const value = snapshot.val(); if (active) setForm({...emptyForm,...value, latitude: String(value.latitude ?? value.location?.latitude ?? ""), longitude: String(value.longitude ?? value.location?.longitude ?? "")}); }).catch(e => { if(active) setError(e.message || "تعذر تحميل المتجر"); }).finally(() => {if(active) setLoading(false);}); return () => {active=false}; }, [storeId]);
 
   const change = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -137,13 +183,18 @@ export default function AddStorePage() {
         </div>
 
         <div style={{ ...sectionTitle, marginTop: 26 }}><MapPin size={18}/> موقع المتجر على الخريطة</div>
-        <p style={{ color: "#697773", fontSize: 13 }}>حدد موقع المتجر باستخدام الإحداثيات أو موقعك الحالي. يمكنك أيضًا فتح خرائط Google والضغط مطولًا على الموقع لنسخ إحداثياته.</p>
-        <div style={gridStyle}>
+        <p style={{ color: "#697773", fontSize: 13 }}>افتح الخريطة واضغط على موقع المتجر، وهتتسجل الإحداثيات تلقائيًا. تقدر تحرك الخريطة وتكبرها لتحديد المكان بدقة.</p>
+        <button type="button" style={primaryButton} onClick={() => { setMapOpen(v => !v); setMapError(false); }}><MapPin size={17}/>{mapOpen ? "إغلاق الخريطة" : "تحديد موقع المتجر على الخريطة"}</button>
+        {mapOpen && <div style={{ marginTop: 14 }}>
+          {mapError && <p style={{ color: "#b42318" }}>تعذر تحميل الخريطة التفاعلية. استخدم زر موقعي الحالي أو أدخل الإحداثيات يدويًا.</p>}
+          <div ref={mapElement} style={{ width: "100%", height: 350, border: "1px solid #d8e2de", borderRadius: 12, overflow: "hidden", display: mapError ? "none" : "block" }} />
+          <p style={{ fontSize: 12, color: "#697773" }}>اضغط مرة واحدة على مكان المتجر لوضع العلامة وحفظ الإحداثيات في الحقول أدناه.</p>
+        </div>}
+        <div style={{ ...gridStyle, marginTop: 14 }}>
           <Field label="خط العرض Latitude *"><input style={inputStyle} type="number" step="any" value={form.latitude} onChange={e => change("latitude", e.target.value)} placeholder="26.55..." /></Field>
           <Field label="خط الطول Longitude *"><input style={inputStyle} type="number" step="any" value={form.longitude} onChange={e => change("longitude", e.target.value)} placeholder="31.69..." /></Field>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-          <button type="button" style={secondaryButton} onClick={() => window.open("https://www.google.com/maps", "_blank", "noopener,noreferrer")}>اختيار الموقع من Google Maps</button>
           <button type="button" style={secondaryButton} onClick={() => {
             if (!navigator.geolocation) return setError("المتصفح لا يدعم تحديد الموقع");
             navigator.geolocation.getCurrentPosition(
@@ -152,12 +203,8 @@ export default function AddStorePage() {
               { enableHighAccuracy: true, timeout: 15000 }
             );
           }}>استخدام موقعي الحالي</button>
-          <button type="button" style={secondaryButton} onClick={() => { setMapOpen(v => !v); setMapError(false); }}> {mapOpen ? "إخفاء المعاينة" : "معاينة الموقع"} </button>
+          <button type="button" style={secondaryButton} onClick={() => window.open("https://www.google.com/maps", "_blank", "noopener,noreferrer")}>فتح Google Maps كبديل</button>
         </div>
-        {mapOpen && <div style={{ marginTop: 14 }}>
-          <p style={{ fontSize: 12, color: "#697773" }}>المعاينة للعرض فقط؛ اختيار الموقع يتم بإدخال الإحداثيات أو زر الموقع الحالي.</p>
-          {mapError ? <p style={{ color: "#b42318" }}>خدمة معاينة الخريطة غير متاحة حاليًا. يمكنك الاستمرار في إضافة المتجر بالإحداثيات.</p> : <iframe title="معاينة موقع المتجر" style={{ width: "100%", height: 250, border: "1px solid #d8e2de", borderRadius: 12 }} loading="lazy" onError={() => setMapError(true)} src={mapUrl(Number(form.latitude) || MAP_CENTER.lat, Number(form.longitude) || MAP_CENTER.lng)} />}
-        </div>}
         <div style={{ ...sectionTitle, marginTop: 26 }}><ImagePlus size={18}/> تفاصيل إضافية</div>
         <div style={gridStyle}>
           <Field label="صورة / لوجو المتجر"><input type="file" accept="image/*" onChange={handleImage} /></Field>
