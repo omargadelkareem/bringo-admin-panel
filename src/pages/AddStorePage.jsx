@@ -75,7 +75,7 @@ export default function AddStorePage() {
         const center = valid ? [lat, lng] : [MAP_CENTER.lat, MAP_CENTER.lng];
         const map = L.map(mapElement.current).setView(center, valid ? 16 : 12);
         mapInstance.current = map;
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 19 }).addTo(map);
+        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", { attribution: "Tiles &copy; Esri", maxZoom: 19 }).addTo(map);
         if (valid) markerInstance.current = L.marker(center).addTo(map);
         map.on("click", event => {
           const position = event.latlng;
