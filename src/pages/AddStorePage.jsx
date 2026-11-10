@@ -5,6 +5,10 @@ import { ArrowRight, ImagePlus, MapPin, Save, Store } from "lucide-react";
 import { db } from "../firebase";
 import "../admin-v2.css";
 
+const MAP_CENTER = { lat: 26.5569, lng: 31.6948 };
+const mapUrl = (lat, lng) => `https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.025}%2C${lat-0.018}%2C${lng+0.025}%2C${lat+0.018}&layer=mapnik&marker=${lat}%2C${lng}`;
+
+
 const types = {
   restaurant: "مطعم",
   supermarket: "سوبر ماركت",
@@ -45,6 +49,8 @@ export default function AddStorePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(isEdit);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapError, setMapError] = useState(false);
   useEffect(() => { if (!storeId) return; let active = true; get(ref(db, `stores/${storeId}`)).then(snapshot => { if (!snapshot.exists()) throw new Error("المتجر غير موجود"); const value = snapshot.val(); if (active) setForm({...emptyForm,...value, latitude: String(value.latitude ?? value.location?.latitude ?? ""), longitude: String(value.longitude ?? value.location?.longitude ?? "")}); }).catch(e => { if(active) setError(e.message || "تعذر تحميل المتجر"); }).finally(() => {if(active) setLoading(false);}); return () => {active=false}; }, [storeId]);
 
   const change = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -131,13 +137,13 @@ export default function AddStorePage() {
         </div>
 
         <div style={{ ...sectionTitle, marginTop: 26 }}><MapPin size={18}/> موقع المتجر على الخريطة</div>
-        <p style={{ color: "#697773", fontSize: 12 }}>افتح خرائط OpenStreetMap، اضغط مطولاً على موقع المتجر وانسخ خط العرض وخط الطول. أو استخدم موقعي الحالي لو أنت داخل المتجر.</p>
+        <p style={{ color: "#697773", fontSize: 13 }}>حدد موقع المتجر باستخدام الإحداثيات أو موقعك الحالي. يمكنك أيضًا فتح خرائط Google والضغط مطولًا على الموقع لنسخ إحداثياته.</p>
         <div style={gridStyle}>
           <Field label="خط العرض Latitude *"><input style={inputStyle} type="number" step="any" value={form.latitude} onChange={e => change("latitude", e.target.value)} placeholder="26.55..." /></Field>
           <Field label="خط الطول Longitude *"><input style={inputStyle} type="number" step="any" value={form.longitude} onChange={e => change("longitude", e.target.value)} placeholder="31.69..." /></Field>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-          <button type="button" style={secondaryButton} onClick={() => window.open("https://www.openstreetmap.org/", "_blank", "noopener,noreferrer")}>فتح الخريطة</button>
+          <button type="button" style={secondaryButton} onClick={() => window.open("https://www.google.com/maps", "_blank", "noopener,noreferrer")}>اختيار الموقع من Google Maps</button>
           <button type="button" style={secondaryButton} onClick={() => {
             if (!navigator.geolocation) return setError("المتصفح لا يدعم تحديد الموقع");
             navigator.geolocation.getCurrentPosition(
@@ -146,8 +152,12 @@ export default function AddStorePage() {
               { enableHighAccuracy: true, timeout: 15000 }
             );
           }}>استخدام موقعي الحالي</button>
+          <button type="button" style={secondaryButton} onClick={() => { setMapOpen(v => !v); setMapError(false); }}> {mapOpen ? "إخفاء المعاينة" : "معاينة الموقع"} </button>
         </div>
-        {form.latitude && form.longitude && Number.isFinite(Number(form.latitude)) && Number.isFinite(Number(form.longitude)) && <iframe title="معاينة موقع المتجر" style={{ width: "100%", height: 250, border: "1px solid #d8e2de", borderRadius: 12, marginTop: 14 }} loading="lazy" src={`https://www.openstreetmap.org/export/embed.html?marker=${encodeURIComponent(form.latitude)},${encodeURIComponent(form.longitude)}&layer=mapnik`} />}
+        {mapOpen && <div style={{ marginTop: 14 }}>
+          <p style={{ fontSize: 12, color: "#697773" }}>المعاينة للعرض فقط؛ اختيار الموقع يتم بإدخال الإحداثيات أو زر الموقع الحالي.</p>
+          {mapError ? <p style={{ color: "#b42318" }}>خدمة معاينة الخريطة غير متاحة حاليًا. يمكنك الاستمرار في إضافة المتجر بالإحداثيات.</p> : <iframe title="معاينة موقع المتجر" style={{ width: "100%", height: 250, border: "1px solid #d8e2de", borderRadius: 12 }} loading="lazy" onError={() => setMapError(true)} src={mapUrl(Number(form.latitude) || MAP_CENTER.lat, Number(form.longitude) || MAP_CENTER.lng)} />}
+        </div>}
         <div style={{ ...sectionTitle, marginTop: 26 }}><ImagePlus size={18}/> تفاصيل إضافية</div>
         <div style={gridStyle}>
           <Field label="صورة / لوجو المتجر"><input type="file" accept="image/*" onChange={handleImage} /></Field>
