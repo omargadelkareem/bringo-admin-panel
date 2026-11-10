@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { get, push, ref, set, update } from "firebase/database";
-import { ArrowRight, ImagePlus, MapPin, Save, Store } from "lucide-react";
+import { ArrowRight, ImagePlus, KeyRound, MapPin, Save, Store } from "lucide-react";
 import { db } from "../firebase";
 import "../admin-v2.css";
 
@@ -40,11 +40,15 @@ const emptyForm = {
   isOpen: true,
 };
 
+const emptyProvider = { name: "", email: "", password: "", isActive: true };
+
 export default function AddStorePage() {
   const navigate = useNavigate();
   const { storeId } = useParams();
   const isEdit = Boolean(storeId);
   const [form, setForm] = useState(emptyForm);
+  const [provider, setProvider] = useState(emptyProvider);
+  const [providerId, setProviderId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(isEdit);
@@ -97,9 +101,28 @@ export default function AddStorePage() {
     else markerInstance.current = L.marker([lat, lng]).addTo(mapInstance.current);
     mapInstance.current.panTo([lat, lng]);
   }, [form.latitude, form.longitude]);
-  useEffect(() => { if (!storeId) return; let active = true; get(ref(db, `stores/${storeId}`)).then(snapshot => { if (!snapshot.exists()) throw new Error("المتجر غير موجود"); const value = snapshot.val(); if (active) setForm({...emptyForm,...value, latitude: String(value.latitude ?? value.location?.latitude ?? ""), longitude: String(value.longitude ?? value.location?.longitude ?? "")}); }).catch(e => { if(active) setError(e.message || "تعذر تحميل المتجر"); }).finally(() => {if(active) setLoading(false);}); return () => {active=false}; }, [storeId]);
+  useEffect(() => {
+    if (!storeId) return;
+    let active = true;
+    Promise.all([get(ref(db, `stores/${storeId}`)), get(ref(db, "providerUsers"))])
+      .then(([snapshot, providersSnapshot]) => {
+        if (!snapshot.exists()) throw new Error("المتجر غير موجود");
+        const value = snapshot.val();
+        if (!active) return;
+        setForm({ ...emptyForm, ...value, latitude: String(value.latitude ?? value.location?.latitude ?? ""), longitude: String(value.longitude ?? value.location?.longitude ?? "") });
+        const found = Object.entries(providersSnapshot.val() || {}).find(([, user]) => String(user?.storeId || "") === String(storeId));
+        if (found) {
+          setProviderId(found[0]);
+          setProvider({ ...emptyProvider, ...found[1], password: String(found[1]?.password || ""), isActive: found[1]?.isActive !== false });
+        }
+      })
+      .catch(e => { if (active) setError(e.message || "تعذر تحميل المتجر"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [storeId]);
 
   const change = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+  const changeProvider = (key, value) => setProvider(prev => ({ ...prev, [key]: value }));
 
   const handleImage = (event) => {
     const file = event.target.files?.[0];
@@ -122,6 +145,10 @@ export default function AddStorePage() {
     const lat = Number(form.latitude), lng = Number(form.longitude);
     if (!form.latitude || !form.longitude || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) return setError("حدد إحداثيات المتجر الصحيحة لحساب رسوم التوصيل");
 
+    const hasProvider = provider.name.trim() || provider.email.trim() || provider.password.trim() || Boolean(providerId);
+    if (hasProvider && !provider.name.trim()) return setError("اكتب اسم مستخدم المتجر");
+    if (hasProvider && !provider.email.trim()) return setError("اكتب البريد الإلكتروني لمستخدم المتجر");
+    if (hasProvider && !provider.password.trim()) return setError("اكتب كلمة مرور مستخدم المتجر");
     try {
       setSaving(true);
       const storeRef = isEdit ? ref(db, `stores/${storeId}`) : push(ref(db, "stores"));
@@ -144,8 +171,20 @@ export default function AddStorePage() {
         acceptsOrders: form.isOpen,
         updatedAt: now,
       };
-      if (isEdit) { await update(storeRef, data); navigate("/stores"); }
-      else { await set(storeRef, {...data, createdAt: now}); navigate(`/stores/${id}/products`); }
+      if (isEdit) await update(storeRef, data);
+      else await set(storeRef, { ...data, createdAt: now });
+      if (hasProvider) {
+        const pid = providerId || push(ref(db, "providerUsers")).key;
+        await set(ref(db, `providerUsers/${pid}`), {
+          id: pid, storeId: id, storeName: form.name.trim(),
+          name: provider.name.trim(), email: provider.email.trim().toLowerCase(),
+          password: provider.password.trim(), role: "provider",
+          isActive: provider.isActive !== false,
+          createdAt: providerId ? (provider.createdAt || now) : now, updatedAt: now,
+        });
+      }
+      if (isEdit) navigate("/stores");
+      else navigate(`/stores/${id}/products`);
     } catch (e) {
       console.error("Add store error:", e);
       setError(`تعذر إضافة المتجر${e?.code ? ` (${e.code})` : ""}`);
@@ -204,6 +243,14 @@ export default function AddStorePage() {
             );
           }}>استخدام موقعي الحالي</button>
           <button type="button" style={secondaryButton} onClick={() => window.open("https://www.google.com/maps", "_blank", "noopener,noreferrer")}>فتح Google Maps كبديل</button>
+        </div>
+        <div style={{ ...sectionTitle, marginTop: 26 }}><KeyRound size={18}/> حساب مستخدم المتجر</div>
+        <p style={{ color: "#697773", fontSize: 13 }}>بيانات الدخول للوحة صاحب المتجر. عند تعديل متجر موجود هتظهر بيانات حسابه المسجلة.</p>
+        <div style={gridStyle}>
+          <Field label="اسم المستخدم"><input style={inputStyle} value={provider.name} onChange={e => changeProvider("name", e.target.value)} placeholder="اسم صاحب / مدير المتجر" /></Field>
+          <Field label="البريد الإلكتروني"><input type="email" style={inputStyle} value={provider.email} onChange={e => changeProvider("email", e.target.value)} placeholder="store@example.com" /></Field>
+          <Field label="كلمة المرور"><input type="password" autoComplete="new-password" style={inputStyle} value={provider.password} onChange={e => changeProvider("password", e.target.value)} placeholder="كلمة مرور لوحة المتجر" /></Field>
+          <Field label="حالة الحساب"><select style={inputStyle} value={provider.isActive ? "active" : "disabled"} onChange={e => changeProvider("isActive", e.target.value === "active")}><option value="active">مفعل</option><option value="disabled">موقوف</option></select></Field>
         </div>
         <div style={{ ...sectionTitle, marginTop: 26 }}><ImagePlus size={18}/> تفاصيل إضافية</div>
         <div style={gridStyle}>
