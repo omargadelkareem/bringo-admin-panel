@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, Plus } from "lucide-react";
+import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, Plus, Users } from "lucide-react";
 
 const primary=[
  {to:"/dashboard",label:"نظرة عامة",icon:LayoutGrid},
  {to:"/orders",label:"الطلبات",icon:ReceiptText},
+ {to:"/customers",label:"العملاء",icon:Users},
  {to:"/drivers",label:"الطيارين",icon:Bike},
  {to:"/stores",label:"المتاجر",icon:Store},
  {to:"/stores/new",label:"إضافة متجر",icon:Plus},
