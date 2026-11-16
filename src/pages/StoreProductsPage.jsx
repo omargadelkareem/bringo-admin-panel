@@ -427,6 +427,33 @@ export default function StoreProductsPage() {
     }
   };
 
+  const exportStoreProducts = () => {
+    if (!products.length) {
+      alert("لا توجد منتجات مسجلة لهذا المتجر");
+      return;
+    }
+    // All products belonging to the selected store, regardless of search/filter.
+    // Columns match the existing Excel import parser for convenient reuse.
+    const columns = [
+      "name", "brand", "price", "oldPrice", "image", "stock", "unit",
+      "menuCategoryName", "description", "isAvailable", "isBestSeller", "isOffer"
+    ];
+    const rows = products.map(product => Object.fromEntries(
+      columns.map(key => [key, product[key] ??
+        (key === "isAvailable" ? true : ["isBestSeller", "isOffer"].includes(key) ? false : "")])
+    ));
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: columns });
+    worksheet["!cols"] = columns.map(key => ({ wch:
+      key === "image" ? 65 : key === "description" ? 45 :
+      ["name", "menuCategoryName"].includes(key) ? 30 : 18
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
+    const safeName = String(storeName).replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, "_").slice(0, 60);
+    XLSX.writeFile(workbook,
+      `Bringo_${safeName}_Products_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const filteredProducts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return products.filter((product) => {
@@ -486,6 +513,7 @@ export default function StoreProductsPage() {
             استيراد منتجات Excel / CSV
             <input type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleImportFile} />
           </label>
+          <button type="button" onClick={exportStoreProducts} disabled={loading || products.length === 0}>تصدير منتجات المتجر Excel ({products.length})</button>
           <button type="button" className="danger" onClick={deleteAllStoreProducts} disabled={loading || products.length === 0}>
             حذف كل المنتجات ({products.length})
           </button>
