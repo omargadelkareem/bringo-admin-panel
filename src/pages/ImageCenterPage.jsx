@@ -81,24 +81,52 @@ export default function ImageCenterPage(){
   }
   return map;
  },[products,stores]);
- const fetchImages=async g=>{
-  setBusy(g.id);setError("");
-  try{
-   const query=overrides[g.id]||g.query;
-   if(!query)throw Error("اكتب كلمة بحث بالإنجليزي للمجموعة دي");
-   const params=new URLSearchParams({action:"query",generator:"search",gsrsearch:"filetype:bitmap "+query,
-    gsrnamespace:"6",gsrlimit:"15",prop:"imageinfo",iiprop:"url|extmetadata|mime",iiurlwidth:"320",format:"json",origin:"*"});
-   const response=await fetch("https://commons.wikimedia.org/w/api.php?"+params);
-   if(!response.ok)throw Error("فشل تحميل الصور من Wikimedia Commons");
-   const json=await response.json();
-   const images=Object.values(json.query?.pages||{}).map(p=>{
+ const translateArabicTerm = async term => {
+  if (!/[\u0600-\u06FF]/.test(term)) return "";
+  try {
+   const params = new URLSearchParams({action:"wbsearchentities",search:term,language:"ar",uselang:"ar",limit:"3",format:"json",origin:"*"});
+   const response = await fetch("https://www.wikidata.org/w/api.php?"+params);
+   if (!response.ok) return "";
+   const data = await response.json();
+   const match = (data.search||[]).find(x=>normalize(x.label)===normalize(term)) || data.search?.[0];
+   if (!match?.id) return "";
+   const details = new URLSearchParams({action:"wbgetentities",ids:match.id,props:"labels",languages:"en",format:"json",origin:"*"});
+   const entityResponse = await fetch("https://www.wikidata.org/w/api.php?"+details);
+   if (!entityResponse.ok) return "";
+   const entity = await entityResponse.json();
+   return entity.entities?.[match.id]?.labels?.en?.value || "";
+  } catch { return ""; }
+ };
+ const searchCommons = async query => {
+   const params = new URLSearchParams({action:"query",generator:"search",gsrsearch:"filetype:bitmap "+query,
+    gsrnamespace:"6",gsrlimit:"24",prop:"imageinfo",iiprop:"url|extmetadata|mime",iiurlwidth:"320",format:"json",origin:"*"});
+   const response = await fetch("https://commons.wikimedia.org/w/api.php?"+params);
+   if(!response.ok)throw Error("تعذر الاتصال بمكتبة الصور");
+   const json = await response.json();
+   return Object.values(json.query?.pages||{}).map(p=>{
     const info=p.imageinfo?.[0]||{},meta=info.extmetadata||{};
     return {image:info.url||"",thumb:info.thumburl||info.url||"",imageSourceUrl:info.descriptionurl||"",
      imageLicense:String(meta.LicenseShortName?.value||""),imageLicenseUrl:String(meta.LicenseUrl?.value||""),
      imageCredit:String(meta.Artist?.value||"").replace(/<[^>]*>/g,"").slice(0,200),mime:info.mime||""};
    }).filter(x=>x.image.startsWith("https://")&&x.mime.startsWith("image/")&&knownLicense(x.imageLicense));
-   setCandidates(prev=>({...prev,[g.id]:images.slice(0,8)}));
-   if(!images.length)setError("مفيش صور مناسبة بترخيص مفتوح للبحث ده. جرّب كلمة تانية.");
+ };
+ const fetchImages=async g=>{
+  setBusy(g.id);setError("");
+  try{
+   // Arabic is the primary input. Existing English keywords are an optional fallback.
+   const typed=String(overrides[g.id]??"").trim();
+   const original=typed||String(g.label||"").trim();
+   const english=await translateArabicTerm(original);
+   const queries=[original,english,(!typed?g.query:"")].filter((x,i,a)=>x&&a.indexOf(x)===i);
+   if(!queries.length)throw Error("اكتب اسم المنتج بالعربي");
+   const results=[];
+   for(const query of queries){
+    const images=await searchCommons(query);
+    for(const item of images)if(!results.some(x=>x.image===item.image))results.push(item);
+    if(results.length>=8)break;
+   }
+   setCandidates(prev=>({...prev,[g.id]:results.slice(0,8)}));
+   if(!results.length)setError("ملقيناش صور مناسبة للاسم ده. جرّب الاسم التجاري أو اسم المادة الفعالة بالعربي، ومش مطلوب منك تكتب إنجليزي.");
   }catch(e){setError(e.message);}finally{setBusy("");}
  };
  const apply=async(g,photo)=>{
@@ -135,7 +163,7 @@ export default function ImageCenterPage(){
     </select>
     <label style={{display:"flex",alignItems:"center",gap:6}}><input type="checkbox" checked={groupsOnly} onChange={e=>setGroupsOnly(e.target.checked)}/>المجموعات ذات اقتراح بحث جاهز فقط</label>
    </div>
-   <p style={{marginBottom:0,fontSize:13}}>في السوبر ماركت والصيدليات والتجميل، المطابقة بالاسم والماركة وليس بمجرد نوع المنتج. اكتب كلمة بحث دقيقة عند الحاجة. الصور الخارجية مقترحات وليست مطابقة مضمونة. اعتمد صورة واحدة لكل مجموعة، وهي تتطبق على المنتجات الناقصة في المتاجر المحددة. المنتجات ذات الصور الحالية لا تتغير.</p>
+   <p style={{marginBottom:0,fontSize:13}}>في السوبر ماركت والصيدليات والتجميل، المطابقة بالاسم والماركة وليس بمجرد نوع المنتج. البحث بالعربي متاح، ولا يحتاج معرفة الاسم بالإنجليزي. اكتب اسم المنتج بالعربي عند الحاجة، والنظام يحاول إيجاد مقابله بالإنجليزي تلقائيًا. الصور الخارجية مقترحات وليست مطابقة مضمونة. اعتمد صورة واحدة لكل مجموعة، وهي تتطبق على المنتجات الناقصة في المتاجر المحددة. المنتجات ذات الصور الحالية لا تتغير.</p>
   </div>
   {error&&<p role="alert" style={{color:"#b91c1c"}}>{error}</p>}
   {groups.map(g=>{
@@ -153,7 +181,7 @@ export default function ImageCenterPage(){
      <img src={suggestion.image} alt={g.label} style={{width:68,height:68,objectFit:"contain",borderRadius:8}}/>
      <small>صورة موجودة بالفعل لمنتج من نفس النوع — راجعها قبل التعميم</small></div>}
     <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
-     <input style={{flex:1,minWidth:180}} placeholder="كلمة بحث بالإنجليزي (اختياري)" value={overrides[g.id]??g.query??""} onChange={e=>setOverrides(p=>({...p,[g.id]:e.target.value}))}/>
+     <input style={{flex:1,minWidth:180}} placeholder="اكتب اسم المنتج بالعربي (اختياري)" value={overrides[g.id]??""} onChange={e=>setOverrides(p=>({...p,[g.id]:e.target.value}))}/>
      <small style={{alignSelf:"center"}}>أمثلة: {g.products.slice(0,3).map(p=>p.name).join("، ")}</small>
     </div>
     {options.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(145px,1fr))",gap:12,marginTop:14}}>
