@@ -1,0 +1,79 @@
+import {useEffect,useMemo,useState} from "react";
+import {db} from "../firebase";
+import {onValue,ref,push,update} from "firebase/database";
+const catalog=[{"category":"مشروبات غازية","brand":"بيبسي","name":"بيبسي كانز 330 مل"},{"category":"مشروبات غازية","brand":"بيبسي","name":"بيبسي 1 لتر"},{"category":"مشروبات غازية","brand":"بيبسي","name":"بيبسي 2 لتر"},{"category":"مشروبات غازية","brand":"سفن أب","name":"سفن أب كانز 330 مل"},{"category":"مشروبات غازية","brand":"سفن أب","name":"سفن أب 1 لتر"},{"category":"مشروبات غازية","brand":"ميرندا","name":"ميرندا برتقال كانز 330 مل"},{"category":"مشروبات غازية","brand":"ميرندا","name":"ميرندا برتقال 1 لتر"},{"category":"مشروبات غازية","brand":"كوكاكولا","name":"كوكاكولا كانز 330 مل"},{"category":"مشروبات غازية","brand":"كوكاكولا","name":"كوكاكولا 1 لتر"},{"category":"مشروبات غازية","brand":"سبرايت","name":"سبرايت كانز 330 مل"},{"category":"الشيبسي والتسالي","brand":"شيبسي","name":"شيبسي ملح"},{"category":"الشيبسي والتسالي","brand":"شيبسي","name":"شيبسي طماطم"},{"category":"الشيبسي والتسالي","brand":"شيبسي","name":"شيبسي شطة وليمون"},{"category":"الشيبسي والتسالي","brand":"شيبسي","name":"شيبسي جبنة متبلة"},{"category":"الشيبسي والتسالي","brand":"دوريتوس","name":"دوريتوس ناتشو تشيز"},{"category":"الشيبسي والتسالي","brand":"دوريتوس","name":"دوريتوس حار"},{"category":"الشيبسي والتسالي","brand":"تايجر","name":"تايجر شيبسي"},{"category":"الشيبسي والتسالي","brand":"لايز","name":"لايز ملح"},{"category":"أرز ومكرونة","brand":"الضحى","name":"أرز الضحى أبيض 1 كجم"},{"category":"أرز ومكرونة","brand":"الضحى","name":"أرز الضحى أبيض 5 كجم"},{"category":"أرز ومكرونة","brand":"الملكة","name":"مكرونة الملكة اسباجتي 400 جم"},{"category":"أرز ومكرونة","brand":"الملكة","name":"مكرونة الملكة خواتم 400 جم"},{"category":"أرز ومكرونة","brand":"الملكة","name":"مكرونة الملكة قلم 400 جم"},{"category":"أرز ومكرونة","brand":"ريجينا","name":"مكرونة ريجينا اسباجتي 400 جم"},{"category":"أرز ومكرونة","brand":"ريجينا","name":"مكرونة ريجينا قلم 400 جم"},{"category":"البن والشاي والقهوة","brand":"شاهين","name":"بن شاهين سادة"},{"category":"البن والشاي والقهوة","brand":"شاهين","name":"بن شاهين محوج"},{"category":"البن والشاي والقهوة","brand":"أبو عوف","name":"بن أبو عوف سادة"},{"category":"البن والشاي والقهوة","brand":"أبو عوف","name":"بن أبو عوف محوج"},{"category":"البن والشاي والقهوة","brand":"نسكافيه","name":"نسكافيه كلاسيك"},{"category":"البن والشاي والقهوة","brand":"نسكافيه","name":"نسكافيه جولد"},{"category":"البن والشاي والقهوة","brand":"ليبتون","name":"شاي ليبتون فتلة"},{"category":"البن والشاي والقهوة","brand":"ليبتون","name":"شاي ليبتون ناعم"},{"category":"البن والشاي والقهوة","brand":"العروسة","name":"شاي العروسة"},{"category":"المنظفات","brand":"أريال","name":"مسحوق أريال للغسيل الأوتوماتيك"},{"category":"المنظفات","brand":"أريال","name":"مسحوق أريال للغسيل العادي"},{"category":"المنظفات","brand":"برسيل","name":"برسيل جل للغسيل"},{"category":"المنظفات","brand":"برسيل","name":"برسيل مسحوق للغسيل"},{"category":"المنظفات","brand":"تايد","name":"مسحوق تايد للغسيل"},{"category":"المنظفات","brand":"بريل","name":"بريل سائل غسيل أطباق"},{"category":"المنظفات","brand":"فيري","name":"فيري سائل غسيل أطباق"},{"category":"المنظفات","brand":"كلوركس","name":"كلوركس مبيض"},{"category":"المنظفات","brand":"داوني","name":"داوني منعم ملابس"},{"category":"المنظفات","brand":"ديتول","name":"ديتول مطهر"},{"category":"حفاضات الأطفال","brand":"بامبرز","name":"بامبرز مقاس 2"},{"category":"حفاضات الأطفال","brand":"بامبرز","name":"بامبرز مقاس 3"},{"category":"حفاضات الأطفال","brand":"بامبرز","name":"بامبرز مقاس 4"},{"category":"حفاضات الأطفال","brand":"بامبرز","name":"بامبرز مقاس 5"},{"category":"حفاضات الأطفال","brand":"بامبرز","name":"بامبرز مقاس 6"},{"category":"حفاضات الأطفال","brand":"مولفيكس","name":"مولفيكس مقاس 3"},{"category":"حفاضات الأطفال","brand":"مولفيكس","name":"مولفيكس مقاس 4"},{"category":"حفاضات الأطفال","brand":"مولفيكس","name":"مولفيكس مقاس 5"},{"category":"حفاضات الأطفال","brand":"بيبي جوي","name":"بيبي جوي مقاس 3"},{"category":"حفاضات الأطفال","brand":"بيبي جوي","name":"بيبي جوي مقاس 4"},{"category":"حفاضات الأطفال","brand":"بيبي جوي","name":"بيبي جوي مقاس 5"},{"category":"الألبان والجبن","brand":"جهينة","name":"لبن جهينة كامل الدسم 1 لتر"},{"category":"الألبان والجبن","brand":"جهينة","name":"لبن جهينة خالي الدسم 1 لتر"},{"category":"الألبان والجبن","brand":"جهينة","name":"زبادي جهينة"},{"category":"الألبان والجبن","brand":"دومتي","name":"جبنة دومتي فيتا"},{"category":"الألبان والجبن","brand":"دومتي","name":"جبنة دومتي اسطنبولي"},{"category":"الألبان والجبن","brand":"دومتي","name":"جبنة دومتي رومي"},{"category":"الألبان والجبن","brand":"عبور لاند","name":"جبنة عبور لاند فيتا"},{"category":"الألبان والجبن","brand":"عبور لاند","name":"جبنة عبور لاند اسطنبولي"},{"category":"الألبان والجبن","brand":"بريزيدن","name":"جبنة بريزيدن مثلثات"},{"category":"الألبان والجبن","brand":"بريزيدن","name":"جبنة بريزيدن فيتا"},{"category":"الألبان والجبن","brand":"المراعي","name":"لبن المراعي كامل الدسم 1 لتر"},{"category":"زيوت وسمن","brand":"كريستال","name":"زيت كريستال عباد الشمس 1 لتر"},{"category":"زيوت وسمن","brand":"كريستال","name":"زيت كريستال ذرة 1 لتر"},{"category":"زيوت وسمن","brand":"عافية","name":"زيت عافية ذرة 1 لتر"},{"category":"زيوت وسمن","brand":"روابي","name":"سمن روابي"},{"category":"زيوت وسمن","brand":"جنة","name":"زيت جنة خليط 1 لتر"},{"category":"معلبات وصلصات","brand":"هاينز","name":"كاتشب هاينز"},{"category":"معلبات وصلصات","brand":"هاينز","name":"مايونيز هاينز"},{"category":"معلبات وصلصات","brand":"قها","name":"صلصة طماطم قها"},{"category":"معلبات وصلصات","brand":"قها","name":"مربى قها فراولة"},{"category":"معلبات وصلصات","brand":"دولفين","name":"تونة دولفين قطع"},{"category":"معلبات وصلصات","brand":"حدائق كاليفورنيا","name":"فول حدائق كاليفورنيا"},{"category":"بسكويت وحلويات","brand":"أوريو","name":"بسكويت أوريو أصلي"},{"category":"بسكويت وحلويات","brand":"بسكريم","name":"بسكويت بسكريم شوكولاتة"},{"category":"بسكويت وحلويات","brand":"مولتو","name":"مولتو شوكولاتة"},{"category":"بسكويت وحلويات","brand":"هوهوز","name":"هوهوز شوكولاتة"},{"category":"بسكويت وحلويات","brand":"توينكيز","name":"توينكيز كريمة"},{"category":"بسكويت وحلويات","brand":"كيت كات","name":"كيت كات شوكولاتة"},{"category":"بسكويت وحلويات","brand":"جلاكسي","name":"شوكولاتة جلاكسي سادة"},{"category":"عصائر ومياه","brand":"جهينة","name":"عصير جهينة مانجو 1 لتر"},{"category":"عصائر ومياه","brand":"جهينة","name":"عصير جهينة برتقال 1 لتر"},{"category":"عصائر ومياه","brand":"بيتي","name":"عصير بيتي مانجو 1 لتر"},{"category":"عصائر ومياه","brand":"بيتي","name":"عصير بيتي جوافة 1 لتر"},{"category":"عصائر ومياه","brand":"نستله","name":"مياه نستله 600 مل"},{"category":"عصائر ومياه","brand":"نستله","name":"مياه نستله 1.5 لتر"},{"category":"عصائر ومياه","brand":"داساني","name":"مياه داساني 600 مل"},{"category":"منتجات أساسية","brand":"الضحى","name":"سكر الضحى 1 كجم"},{"category":"منتجات أساسية","brand":"الضحى","name":"دقيق الضحى 1 كجم"},{"category":"منتجات أساسية","brand":"هارفست","name":"شوفان هارفست"},{"category":"منتجات أساسية","brand":"أمريكانا","name":"فول أمريكانا"},{"category":"منتجات أساسية","brand":"نادك","name":"لبن نادك كامل الدسم"}];
+const normalize=v=>String(v||"").normalize("NFKC").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").trim().toLowerCase();
+export default function SupermarketCatalogPage(){
+ const [stores,setStores]=useState([]),[products,setProducts]=useState([]);
+ const [storeId,setStoreId]=useState(""),[search,setSearch]=useState(""),[category,setCategory]=useState("all");
+ const [selected,setSelected]=useState({}),[prices,setPrices]=useState({}),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
+ useEffect(()=>{
+  const a=onValue(ref(db,"stores"),s=>setStores(Object.entries(s.val()||{}).filter(([,v])=>v.type==="supermarket").map(([id,v])=>({id,...v}))));
+  const b=onValue(ref(db,"products"),s=>setProducts(Object.values(s.val()||{})));
+  return ()=>{a();b();};
+ },[]);
+ const store=stores.find(s=>s.id===storeId);
+ const existing=useMemo(()=>new Set(products.filter(p=>String(p.storeId)===storeId).map(p=>normalize(p.name))),[products,storeId]);
+ const filtered=useMemo(()=>catalog.map((p,i)=>({...p,i})).filter(p=>(category==="all"||p.category===category)&&normalize(p.name+" "+p.brand).includes(normalize(search))),[search,category]);
+ const eligible=filtered.filter(p=>!existing.has(normalize(p.name)));
+ const chosen=eligible.filter(p=>selected[p.i]);
+ const add=async()=>{
+  setMessage("");
+  if(!store){setMessage("اختار السوبر ماركت الأول");return;}
+  const invalid=chosen.filter(p=>!Number.isFinite(Number(prices[p.i]))||Number(prices[p.i])<=0);
+  if(!chosen.length){setMessage("حدد المنتجات اللي عايز تضيفها");return;}
+  if(invalid.length){setMessage("لازم تحدد سعر صحيح لكل منتج قبل إضافته. مفيش أسعار افتراضية.");return;}
+  if(!window.confirm(`إضافة ${chosen.length} منتج إلى ${store.name}؟ المنتجات هتكون غير متاحة للعملاء لحين تحديد المخزون ومراجعة البيانات.`))return;
+  setBusy(true);
+  try{
+   const patch={},now=Date.now();
+   for(const p of chosen){
+    const key=push(ref(db,"products")).key;
+    patch["products/"+key]={id:key,name:p.name,brand:p.brand,price:Number(prices[p.i]),oldPrice:0,image:"",
+     categoryId:"supermarket",categoryName:"السوبر ماركت",storeId,storeName:store.name,storeType:"supermarket",
+     menuCategoryName:p.category,description:"",stock:0,unit:"قطعة",isAvailable:false,isBestSeller:false,isOffer:false,createdAt:now,updatedAt:now};
+   }
+   await update(ref(db),patch);
+   setSelected({});setMessage(`تم إضافة ${chosen.length} منتج إلى ${store.name} كمنتجات غير متاحة لحين تجهيز الصور والمخزون.`);
+  }catch(e){setMessage("تعذر الحفظ: "+e.message);}finally{setBusy(false);}
+ };
+ return <div dir="rtl" style={{paddingBottom:45}}>
+  <div className="page-header"><div><h1 className="page-title">كتالوج السوبر ماركت المصري</h1>
+  <p className="page-subtitle">منتجات بمسميات وماركات مصرية شائعة — اختر ما يتوفر لدى متجرك وحدد سعره قبل الإضافة</p></div></div>
+  <div className="card" style={{marginBottom:18}}>
+   <p>الكتالوج المبدئي يحتوي على {catalog.length} صنف مقترح. الأحجام والعبوات والأسعار والتوفر تحتاج تأكيد من المتجر، ولا يتم إنشاء منتجات أو تغيير بيانات قديمة إلا بعد موافقتك.</p>
+   <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+    <select value={storeId} onChange={e=>{setStoreId(e.target.value);setSelected({});setMessage("");}} style={{minWidth:220,flex:1}}>
+     <option value="">اختر السوبر ماركت</option>{stores.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}
+    </select>
+    <select value={category} onChange={e=>setCategory(e.target.value)} style={{minWidth:190,flex:1}}>
+     <option value="all">كل الأقسام</option>{[...new Set(catalog.map(p=>p.category))].map(x=><option key={x}>{x}</option>)}
+    </select>
+    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث بالعربي عن الماركة أو المنتج" style={{minWidth:220,flex:2}}/>
+   </div>
+  </div>
+  <div className="card">
+   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:15}}>
+    <strong>{eligible.length} منتج متاح للإضافة — {chosen.length} محدد</strong>
+    <div style={{display:"flex",gap:8}}>
+     <button type="button" onClick={()=>setSelected(s=>({...s,...Object.fromEntries(eligible.map(p=>[p.i,true]))}))}>تحديد الظاهر</button>
+     <button type="button" onClick={()=>setSelected({})}>إلغاء التحديد</button>
+    </div>
+   </div>
+   <div style={{overflowX:"auto",maxHeight:"65vh",overflowY:"auto"}}>
+    <table style={{width:"100%",borderCollapse:"collapse",minWidth:620}}>
+     <thead><tr><th>تحديد</th><th>المنتج</th><th>الماركة</th><th>القسم</th><th>سعر البيع (جنيه)</th></tr></thead>
+     <tbody>{eligible.map(p=><tr key={p.i}>
+      <td><input type="checkbox" checked={!!selected[p.i]} onChange={e=>setSelected(s=>({...s,[p.i]:e.target.checked}))}/></td>
+      <td>{p.name}</td><td>{p.brand}</td><td>{p.category}</td>
+      <td><input type="number" min="0.01" step="0.01" placeholder="سعر المتجر" value={prices[p.i]??""} onChange={e=>setPrices(s=>({...s,[p.i]:e.target.value}))} style={{width:115}}/></td>
+     </tr>)}</tbody>
+    </table>
+   </div>
+   {message&&<p role="status" style={{marginTop:15}}>{message}</p>}
+   <div style={{display:"flex",justifyContent:"flex-end",marginTop:18}}>
+    <button type="button" disabled={busy||!store||!chosen.length} onClick={add}>{busy?"جاري الإضافة...":`إضافة ${chosen.length} منتج للمتجر`}</button>
+   </div>
+  </div>
+ </div>;
+}
