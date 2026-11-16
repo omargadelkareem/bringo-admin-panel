@@ -13,6 +13,23 @@ const terms = {
  "شبت":"dill","نعناع":"mint leaves","ثوم":"garlic","بطاطا":"sweet potatoes",
  "باميه":"okra","فاصوليا":"green beans","بسله":"green peas","ملوخيه":"jute mallow"
 };
+const storeTypes = {restaurant:"المطاعم",pharmacy:"الصيدليات",vegetables:"الخضار والفاكهة",supermarket:"السوبر ماركت",beauty:"مستحضرات التجميل",meat:"اللحوم والدواجن",bakery:"المخابز والحلويات",fish:"الأسماك",market:"متاجر متنوعة"};
+const catalog = {
+ restaurant:{"بيتزا":"pizza","برجر":"burger","شاورما":"shawarma","كشري":"koshari","فراخ مشويه":"grilled chicken","كريب":"crepe","فطير":"egyptian pie","محشي":"stuffed vegetables","مكرونه":"pasta","رز":"rice dish","بطاطس محمره":"french fries","كفته":"kofta","كباب":"kebab","سندوتش":"sandwich"},
+ supermarket:{"سكر":"sugar bag","ارز":"rice bag","مكرونه":"pasta package","زيت":"cooking oil bottle","دقيق":"flour bag","لبن":"milk carton","زبادي":"yogurt","جبنه":"cheese","شاي":"tea box","قهوه":"coffee","مياه":"bottled water","بيض":"eggs","تونه":"canned tuna","فول":"canned beans","عصير":"juice carton","بسكويت":"biscuits"},
+ pharmacy:{"شاش":"medical gauze","قطن":"medical cotton","كمامه":"medical face mask","مطهر":"antiseptic bottle","ترمومتر":"digital thermometer","لاصق طبي":"medical tape","حفاضات":"diapers","مناديل مبلله":"wet wipes"},
+ beauty:{"شامبو":"shampoo bottle","بلسم":"conditioner bottle","غسول":"facial cleanser","كريم":"skin cream jar","صابون":"soap bar","واقي شمس":"sunscreen bottle","مزيل عرق":"deodorant","عطر":"perfume bottle","روج":"lipstick","ماسكارا":"mascara","فاونديشن":"foundation makeup","بودره":"face powder","سيروم":"skincare serum"},
+ meat:{"فراخ":"raw chicken","لحمه":"raw beef","كفته":"raw kofta","كبدة":"raw liver"},
+ bakery:{"عيش":"bread","كيك":"cake","بسبوسه":"basbousa","كنافه":"kunafa","بقلاوه":"baklava"},
+ fish:{"سمك":"fresh fish","جمبري":"shrimp","سبيط":"squid"}
+};
+const findCatalogTerm = (name,type) => {
+ const normalized=normalize(name),dictionary=type==="vegetables"?terms:(catalog[type]||{});
+ const matches=Object.keys(dictionary).sort((a,b)=>b.length-a.length);
+ const key=matches.find(k=>normalized===k||normalized.startsWith(k+" "));
+ return key?{key,query:dictionary[key]}:null;
+};
+const exactProductName = p => normalize([p.brand,p.name].filter(Boolean).join(" "));
 const normalize = s => String(s||"").normalize("NFKC").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي")
  .replace(/ة/g,"ه").replace(/[ًٌٍَُِّْـ]/g,"").replace(/[0-9٠-٩.,/\-]+/g," ").replace(/\s+/g," ").trim();
 const keys = Object.keys(terms).sort((a,b)=>b.length-a.length);
@@ -24,8 +41,8 @@ const imageMeta = p => ({
 });
 export default function ImageCenterPage(){
  const [products,setProducts]=useState([]),[stores,setStores]=useState([]);
- const [search,setSearch]=useState(""),[storeFilter,setStoreFilter]=useState("all");
- const [groupsOnly,setGroupsOnly]=useState(true),[selected,setSelected]=useState({});
+ const [search,setSearch]=useState(""),[storeFilter,setStoreFilter]=useState("all"),[typeFilter,setTypeFilter]=useState("all");
+ const [groupsOnly,setGroupsOnly]=useState(false),[selected,setSelected]=useState({});
  const [candidates,setCandidates]=useState({}),[busy,setBusy]=useState(""),[error,setError]=useState("");
  const [overrides,setOverrides]=useState({});
  useEffect(()=>{
@@ -34,30 +51,40 @@ export default function ImageCenterPage(){
   return ()=>{a();b();};
  },[]);
  const missing=useMemo(()=>products.filter(p=>!p.image),[products]);
+ const storeById=useMemo(()=>Object.fromEntries(stores.map(s=>[String(s.firebaseKey),s])),[stores]);
+ const typeOf=p=>p.storeType||storeById[String(p.storeId)]?.type||storeById[String(p.storeId)]?.storeType||"market";
+ const groupOf=p=>{
+  const type=typeOf(p),known=findCatalogTerm(p.name,type);
+  // Packaged and branded products must match by exact product identity, not a broad category.
+  const strict=["supermarket","pharmacy","beauty"].includes(type);
+  const key=strict?exactProductName(p):(known?.key||exactProductName(p));
+  return {id:type+":"+key,label:strict?p.name:(known?.key||p.name),term:strict?"":(known?.key||""),query:strict?"":(known?.query||""),type,products:[]};
+ };
  const groups=useMemo(()=>{
   const result=new Map();
   for(const p of missing){
    if(storeFilter!=="all"&&String(p.storeId)!==storeFilter)continue;
-   const name=category(p.name);
-   const id=name||"unknown:"+normalize(p.name);
-   if(!result.has(id))result.set(id,{id,label:name||p.name,term:name,products:[]});
-   result.get(id).products.push(p);
+   if(typeFilter!=="all"&&typeOf(p)!==typeFilter)continue;
+   const g=groupOf(p);
+   if(!result.has(g.id))result.set(g.id,g);
+   result.get(g.id).products.push(p);
   }
-  return [...result.values()].filter(g=>(!groupsOnly||g.term)&&(!search||normalize(g.label).includes(normalize(search))||g.products.some(p=>normalize(p.name).includes(normalize(search)))))
+  return [...result.values()].filter(g=>(!groupsOnly||g.query)&&(!search||normalize(g.label).includes(normalize(search))||g.products.some(p=>normalize(p.name).includes(normalize(search)))))
    .sort((a,b)=>b.products.length-a.products.length);
- },[missing,storeFilter,groupsOnly,search]);
+ },[missing,storeFilter,typeFilter,groupsOnly,search,stores]);
  const suggestions=useMemo(()=>{
   const map={};
   for(const p of products){
-   const key=category(p.name);
-   if(key&&p.image&&!map[key])map[key]=imageMeta(p);
+   if(!p.image)continue;
+   const g=groupOf(p);
+   if(!map[g.id])map[g.id]=imageMeta(p);
   }
   return map;
- },[products]);
+ },[products,stores]);
  const fetchImages=async g=>{
   setBusy(g.id);setError("");
   try{
-   const query=overrides[g.id]||terms[g.term];
+   const query=overrides[g.id]||g.query;
    if(!query)throw Error("اكتب كلمة بحث بالإنجليزي للمجموعة دي");
    const params=new URLSearchParams({action:"query",generator:"search",gsrsearch:"filetype:bitmap "+query,
     gsrnamespace:"6",gsrlimit:"15",prop:"imageinfo",iiprop:"url|extmetadata|mime",iiurlwidth:"320",format:"json",origin:"*"});
@@ -89,7 +116,7 @@ export default function ImageCenterPage(){
    setSelected(prev=>({...prev,[g.id]:undefined}));
   }catch(e){setError("فشل حفظ الصور: "+e.message);}finally{setBusy("");}
  };
- const knownCount=groups.filter(g=>suggestions[g.term]).length;
+ const knownCount=groups.filter(g=>suggestions[g.id]).length;
  return <div dir="rtl" style={{paddingBottom:40}}>
   <div className="page-header"><div><h1 className="page-title">مركز صور المنتجات</h1>
    <p className="page-subtitle">إدارة موحدة لكل المتاجر — مطابقة جماعية بعد مراجعة صورة واحدة لكل نوع، دون تغيير الصور الموجودة</p></div></div>
@@ -100,19 +127,22 @@ export default function ImageCenterPage(){
   <div className="card" style={{marginBottom:18}}>
    <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
     <input style={{flex:2,minWidth:180}} placeholder="بحث باسم المنتج" value={search} onChange={e=>setSearch(e.target.value)}/>
+    <select style={{flex:1,minWidth:150}} value={typeFilter} onChange={e=>setTypeFilter(e.target.value)}>
+     <option value="all">كل الأنشطة</option>{Object.entries(storeTypes).map(([id,name])=><option key={id} value={id}>{name}</option>)}
+    </select>
     <select style={{flex:1,minWidth:180}} value={storeFilter} onChange={e=>setStoreFilter(e.target.value)}>
      <option value="all">كل المتاجر</option>{stores.map(s=><option key={s.firebaseKey} value={s.firebaseKey}>{s.name||s.firebaseKey}</option>)}
     </select>
-    <label style={{display:"flex",alignItems:"center",gap:6}}><input type="checkbox" checked={groupsOnly} onChange={e=>setGroupsOnly(e.target.checked)}/>المجموعات المعروفة فقط</label>
+    <label style={{display:"flex",alignItems:"center",gap:6}}><input type="checkbox" checked={groupsOnly} onChange={e=>setGroupsOnly(e.target.checked)}/>المجموعات ذات اقتراح بحث جاهز فقط</label>
    </div>
-   <p style={{marginBottom:0,fontSize:13}}>الصور الخارجية مقترحات وليست مطابقة مضمونة. اعتمد صورة واحدة لكل مجموعة، وهي تتطبق على المنتجات الناقصة في المتاجر المحددة. المنتجات ذات الصور الحالية لا تتغير.</p>
+   <p style={{marginBottom:0,fontSize:13}}>في السوبر ماركت والصيدليات والتجميل، المطابقة بالاسم والماركة وليس بمجرد نوع المنتج. اكتب كلمة بحث دقيقة عند الحاجة. الصور الخارجية مقترحات وليست مطابقة مضمونة. اعتمد صورة واحدة لكل مجموعة، وهي تتطبق على المنتجات الناقصة في المتاجر المحددة. المنتجات ذات الصور الحالية لا تتغير.</p>
   </div>
   {error&&<p role="alert" style={{color:"#b91c1c"}}>{error}</p>}
   {groups.map(g=>{
-   const suggestion=suggestions[g.term],options=candidates[g.id]||[];
+   const suggestion=suggestions[g.id],options=candidates[g.id]||[];
    return <div className="card" key={g.id} style={{marginBottom:14}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}>
-     <div><h3 style={{margin:"0 0 6px"}}>{g.label} <small>({g.products.length} منتج)</small></h3>
+     <div><h3 style={{margin:"0 0 6px"}}>{g.label} <small>— {storeTypes[g.type]||g.type}</small> <small>({g.products.length} منتج)</small></h3>
       <small>{[...new Set(g.products.map(p=>p.storeName||stores.find(s=>s.firebaseKey===String(p.storeId))?.name||"متجر"))].slice(0,6).join("، ")}</small></div>
      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
       {suggestion&&<button type="button" disabled={!!busy} onClick={()=>apply(g,suggestion)}>استخدم الصورة الموجودة لكل المجموعة</button>}
@@ -123,7 +153,7 @@ export default function ImageCenterPage(){
      <img src={suggestion.image} alt={g.label} style={{width:68,height:68,objectFit:"contain",borderRadius:8}}/>
      <small>صورة موجودة بالفعل لمنتج من نفس النوع — راجعها قبل التعميم</small></div>}
     <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
-     <input style={{flex:1,minWidth:180}} placeholder="كلمة بحث بالإنجليزي (اختياري)" value={overrides[g.id]??terms[g.term]??""} onChange={e=>setOverrides(p=>({...p,[g.id]:e.target.value}))}/>
+     <input style={{flex:1,minWidth:180}} placeholder="كلمة بحث بالإنجليزي (اختياري)" value={overrides[g.id]??g.query??""} onChange={e=>setOverrides(p=>({...p,[g.id]:e.target.value}))}/>
      <small style={{alignSelf:"center"}}>أمثلة: {g.products.slice(0,3).map(p=>p.name).join("، ")}</small>
     </div>
     {options.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(145px,1fr))",gap:12,marginTop:14}}>
