@@ -67,6 +67,112 @@ export default function StoreProductsPage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
+  const [imagePickerProduct, setImagePickerProduct] = useState(null);
+  const [imageCandidates, setImageCandidates] = useState([]);
+  const [imageSearch, setImageSearch] = useState("");
+  const [imageSearching, setImageSearching] = useState(false);
+  const [imageSaving, setImageSaving] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const [applyToVariants, setApplyToVariants] = useState(true);
+
+  const normalizeProduceName = (value) => String(value || "")
+    .normalize("NFKC").replace(/[أإآ]/g, "ا").replace(/ى/g, "ي")
+    .replace(/ة/g, "ه").replace(/[ًٌٍَُِّْـ]/g, "")
+    .replace(/\\b(كيلو|كجم|جرام|جم|نصف|ربع|واحد|اتنين|ثلاثة|قطعة|ربطة|كيس|عبوة|صندوق)\\b/gi, " ")
+    .replace(/[0-9٠-٩.,/\\-]+/g, " ").replace(/\\s+/g, " ").trim();
+
+  const produceEnglish = {
+    "طماطم":"tomatoes", "طماطم بلدي":"tomatoes", "بطاطس":"potatoes",
+    "بصل":"onions", "بصل احمر":"red onions", "بصل ابيض":"white onions",
+    "خيار":"cucumbers", "جزر":"carrots", "كوسه":"zucchini",
+    "باذنجان":"eggplant", "فلفل":"bell pepper", "فلفل اخضر":"green peppers",
+    "ليمون":"lemons", "برتقال":"oranges", "تفاح":"apples",
+    "تفاح احمر":"red apples", "تفاح اخضر":"green apples",
+    "موز":"bananas", "مانجو":"mangoes", "فراوله":"strawberries",
+    "عنب":"grapes", "رمان":"pomegranates", "جوافه":"guavas",
+    "بطيخ":"watermelon", "شمام":"cantaloupe", "خوخ":"peaches",
+    "كمثرى":"pears", "اناناس":"pineapple", "كيوي":"kiwifruit",
+    "خس":"lettuce", "كرنب":"cabbage", "قرنبيط":"cauliflower",
+    "بروكلي":"broccoli", "سبانخ":"spinach", "بقدونس":"parsley",
+    "كزبره":"coriander leaves", "شبت":"dill", "نعناع":"mint leaves",
+    "ثوم":"garlic", "بطاطا":"sweet potato", "باميه":"okra",
+    "فاصوليا":"green beans", "بسله":"green peas", "ملوخيه":"jute mallow"
+  };
+
+  const findProduceTerm = (name) => {
+    const normalized = normalizeProduceName(name);
+    const keys = Object.keys(produceEnglish).sort((a,b)=>b.length-a.length);
+    return keys.find(key => normalized === key || normalized.startsWith(key + " ")) || "";
+  };
+
+  const missingImageCount = products.filter(p => !p.image).length;
+
+  const searchCommonsImages = async (product, customQuery) => {
+    setImageSearching(true); setImageError(""); setImageCandidates([]);
+    try {
+      const term = findProduceTerm(product.name);
+      const query = String(customQuery || "").trim() || (term ? produceEnglish[term] : "");
+      if (!query) throw new Error("المنتج غير معروف في قاموس الخضار والفاكهة. اكتب اسم البحث بالإنجليزي يدويًا.");
+      const params = new URLSearchParams({
+        action:"query", generator:"search", gsrsearch:`filetype:bitmap ${query}`,
+        gsrnamespace:"6", gsrlimit:"12", prop:"imageinfo",
+        iiprop:"url|extmetadata|mime", iiurlwidth:"360",
+        format:"json", origin:"*"
+      });
+      const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`);
+      if (!response.ok) throw new Error("تعذر الاتصال بمكتبة Wikimedia Commons");
+      const json = await response.json();
+      const pages = Object.values(json.query?.pages || {});
+      const safe = pages.map(page => {
+        const info = page.imageinfo?.[0];
+        const meta = info?.extmetadata || {};
+        const license = String(meta.LicenseShortName?.value || "");
+        const licenseUrl = String(meta.LicenseUrl?.value || "");
+        const allowed = /^(CC0|Public domain|CC BY(?:-SA)?(?: [0-9.]+)?)$/i.test(license);
+        const url = info?.thumburl || info?.url || "";
+        return { title:page.title, url, originalUrl:info?.url || "",
+          source:info?.descriptionurl || "", license, licenseUrl,
+          credit:String(meta.Artist?.value || "").replace(/<[^>]*>/g,"").slice(0,200),
+          allowed };
+      }).filter(item => item.allowed && /^https:\/\//.test(item.url) && /^image\//.test(
+        pages.find(p=>p.title===item.title)?.imageinfo?.[0]?.mime || ""));
+      setImageCandidates(safe.slice(0,8));
+      if (!safe.length) setImageError("لم نجد صورًا بترخيص مناسب. جرّب كلمة بحث أخرى.");
+    } catch (error) { setImageError(error.message); }
+    finally { setImageSearching(false); }
+  };
+
+  const openProduceImagePicker = (product) => {
+    const term = findProduceTerm(product.name);
+    setImagePickerProduct(product); setImageCandidates([]); setImageError("");
+    setImageSearch(term ? produceEnglish[term] : "");
+    if (term) searchCommonsImages(product, produceEnglish[term]);
+  };
+
+  const applyProduceImage = async (candidate) => {
+    if (!imagePickerProduct || imageSaving) return;
+    const term = findProduceTerm(imagePickerProduct.name);
+    const targets = applyToVariants && term
+      ? products.filter(p => !p.image && findProduceTerm(p.name) === term)
+      : [imagePickerProduct];
+    if (!window.confirm(`إسناد الصورة المختارة إلى ${targets.length} منتج؟ راجع تطابق الصورة قبل الحفظ.`)) return;
+    setImageSaving(true); setImageError("");
+    try {
+      const changes = {};
+      for (const product of targets) {
+        changes[`products/${product.firebaseKey}/image`] = candidate.originalUrl;
+        changes[`products/${product.firebaseKey}/imageSourceUrl`] = candidate.source;
+        changes[`products/${product.firebaseKey}/imageLicense`] = candidate.license;
+        changes[`products/${product.firebaseKey}/imageLicenseUrl`] = candidate.licenseUrl;
+        changes[`products/${product.firebaseKey}/imageCredit`] = candidate.credit;
+        changes[`products/${product.firebaseKey}/updatedAt`] = Date.now();
+      }
+      await update(ref(db), changes);
+      setImagePickerProduct(null); setImageCandidates([]);
+    } catch (error) { setImageError("فشل حفظ الصور: " + error.message); }
+    finally { setImageSaving(false); }
+  };
+
 
   useEffect(() => {
     if (!storeId) {
@@ -509,6 +615,7 @@ export default function StoreProductsPage() {
 
       <div className="card">
         <div className="products-toolbar" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+          {storeType === "vegetables" && <span style={{padding:"10px 14px",background:"#edf7f1",borderRadius:10,fontWeight:600}}>منتجات بدون صور: {missingImageCount} — اضغط «اختيار صورة» بجوار أي منتج</span>}
           <label className="import-btn">
             استيراد منتجات Excel / CSV
             <input type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleImportFile} />
@@ -567,6 +674,7 @@ export default function StoreProductsPage() {
                   <td><span className={product.isAvailable === false ? "badge danger-badge" : "badge"}>{product.isAvailable === false ? "غير متاح" : "متاح"}</span></td>
                   <td>{product.isBestSeller && <span>🔥 الأكثر طلبًا </span>}{product.isOffer && <span> 💖 عرض </span>}</td>
                   <td><div className="actions">
+                    {storeType === "vegetables" && <button type="button" onClick={() => openProduceImagePicker(product)}>اختيار صورة</button>}
                     <button type="button" onClick={() => openEditDialog(product)}>تعديل</button>
                     <button type="button" onClick={() => toggleAvailable(product)}>{product.isAvailable === false ? "إتاحة" : "إخفاء"}</button>
                     <button type="button" onClick={() => toggleBestSeller(product)}>{product.isBestSeller ? "إلغاء الأكثر طلبًا" : "الأكثر طلبًا"}</button>
@@ -579,6 +687,27 @@ export default function StoreProductsPage() {
           </table>
         </div>
       </div>
+
+      {imagePickerProduct && <div className="modal-overlay" onClick={() => !imageSaving && setImagePickerProduct(null)}>
+        <div className="modal-card" style={{maxWidth:850,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div className="modal-header"><h2>صور المنتج: {imagePickerProduct.name}</h2><button type="button" disabled={imageSaving} onClick={()=>setImagePickerProduct(null)}>×</button></div>
+          <p>صور مقترحة من Wikimedia Commons بتراخيص مفتوحة. راجع شكل المنتج قبل الحفظ، واحتفظ ببيانات المصدر والترخيص.</p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <input style={{flex:1,minWidth:180}} value={imageSearch} placeholder="اسم المنتج بالإنجليزي" onChange={e=>setImageSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&searchCommonsImages(imagePickerProduct,imageSearch)}/>
+            <button type="button" disabled={imageSearching||imageSaving} onClick={()=>searchCommonsImages(imagePickerProduct,imageSearch)}>{imageSearching?"جاري البحث...":"بحث عن صور"}</button>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:8,margin:"14px 0"}}><input type="checkbox" checked={applyToVariants} onChange={e=>setApplyToVariants(e.target.checked)}/>تطبيق الصورة على الأحجام المختلفة من نفس المنتج التي لا تملك صورًا</label>
+          {imageError && <p role="alert" style={{color:"#b91c1c"}}>{imageError}</p>}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12}}>
+            {imageCandidates.map(item=><div key={item.source} style={{border:"1px solid #ddd",borderRadius:12,padding:8}}>
+              <img src={item.url} alt={item.title} loading="lazy" style={{width:"100%",height:125,objectFit:"contain"}}/>
+              <small style={{display:"block",margin:"6px 0"}}>{item.license}</small>
+              <a href={item.source} target="_blank" rel="noreferrer">المصدر والترخيص</a>
+              <button type="button" disabled={imageSaving} style={{display:"block",marginTop:8,width:"100%"}} onClick={()=>applyProduceImage(item)}>{imageSaving?"جاري الحفظ...":"اعتماد الصورة"}</button>
+            </div>)}
+          </div>
+        </div>
+      </div>}
 
       {editingProduct && (
         <div className="modal-overlay" onClick={closeEditDialog}>
