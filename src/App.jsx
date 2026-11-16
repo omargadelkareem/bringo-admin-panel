@@ -11,6 +11,7 @@ import RestaurantProductsPage from "./pages/RestaurantProductsPage";
 import StoresPage from "./pages/StoresPage";
 import AddStorePage from "./pages/AddStorePage";
 import StoreProductsPage from "./pages/StoreProductsPage";
+import ImageCenterPage from "./pages/ImageCenterPage";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="drivers" element={<DriversPage />} />
         <Route path="stores" element={<StoresPage />} />
+        <Route path="image-center" element={<ImageCenterPage />} />
         <Route path="stores/new" element={<AddStorePage />} />
         <Route path="stores/:storeId/products" element={<StoreProductsPage />} />
         <Route path="banners" element={<BannersPage />} />
