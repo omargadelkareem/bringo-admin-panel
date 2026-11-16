@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, Plus, Users, Images } from "lucide-react";
+import { LayoutGrid, ReceiptText, Bike, Store, Shapes, GalleryHorizontalEnd, Settings, ArrowUpLeft, CircleHelp, Plus, Users, Images, ShoppingBasket } from "lucide-react";
 
 const primary=[
  {to:"/dashboard",label:"نظرة عامة",icon:LayoutGrid},
@@ -12,6 +12,7 @@ const primary=[
 const manage=[
  {to:"/categories",label:"الأقسام",icon:Shapes},
  {to:"/image-center",label:"مركز صور المنتجات",icon:Images},
+ {to:"/supermarket-catalog",label:"كتالوج السوبر ماركت",icon:ShoppingBasket},
  {to:"/banners",label:"المحتوى والعروض",icon:GalleryHorizontalEnd},
 ];
 
